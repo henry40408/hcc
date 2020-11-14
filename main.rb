@@ -7,6 +7,7 @@ def check_ssl_certificate!(hostname, days: 7)
   cert = Net::HTTP.start(hostname, '443', use_ssl: true) { |http| http.peer_cert }
   diff = TimeCalc.(cert.not_after) - not_after
   {
+    hostname: hostname,
     ok: diff.seconds >= 0,
     days: diff.days,
     seconds: diff.seconds,

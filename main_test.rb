@@ -5,6 +5,7 @@ class TestMain < Minitest::Test
   def test_check_ssl_certificate
     r = check_ssl_certificate('example.com')
     assert r[:ok]
+    assert r[:hostname] == 'example.com'
     assert r[:days].is_a?(Integer)
 
     refute check_ssl_certificate('expired.badssl.com')[:ok]
