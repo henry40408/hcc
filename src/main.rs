@@ -3,9 +3,10 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 use anyhow::Context;
-use chrono::{NaiveDateTime, Utc};
+use chrono::{Utc, TimeZone, DateTime, SubsecRound};
 use clap::{App, Arg, SubCommand};
 use rustls::{ClientConfig, Session};
+use serde_derive::{Deserialize, Serialize};
 use x509_parser::parse_x509_certificate;
 
 const CHECK: &'static str = "check";
@@ -31,8 +32,13 @@ fn main() -> anyhow::Result<()> {
     if let Some(ref m) = matches.subcommand_matches(CHECK) {
         let domain_name = m.value_of(DOMAIN_NAME).expect("Domain name is not given");
         let client = CheckClient::new();
-        let resp = client.check_certificate(domain_name);
-        println!("{:?}", resp);
+        match client.check_certificate(domain_name) {
+            Ok(r) => {
+                let s = serde_json::to_string(&r.to_json())?;
+                println!("{0}", s);
+            }
+            Err(e) => println!("{:?}", e),
+        }
     }
 
     Ok(())
@@ -54,7 +60,7 @@ impl CheckClient {
     }
 
     fn check_certificate(&self, domain_name: &str) -> anyhow::Result<CheckResult> {
-        let checked_at = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
+        let checked_at = Utc::now().round_subsecs(0);
 
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain_name)?;
         let mut sess = rustls::ClientSession::new(&self.config, dns_name);
@@ -79,7 +85,7 @@ impl CheckClient {
             Ok((_, cert)) => cert.validity().not_after,
             Err(_) => return Ok(CheckResult::new(domain_name, checked_at)),
         };
-        let not_after = NaiveDateTime::from_timestamp(not_after.timestamp(), 0);
+        let not_after = Utc.timestamp(not_after.timestamp(), 0);
 
         let duration = not_after - checked_at;
         Ok(CheckResult {
@@ -95,11 +101,11 @@ impl CheckClient {
     fn build_http_headers(domain_name: &str) -> String {
         format!(
             concat!(
-                "GET / HTTP/1.1\r\n",
-                "Host: {0}\r\n",
-                "Connection: close\r\n",
-                "Accept-Encoding: identity\r\n",
-                "\r\n"
+            "GET / HTTP/1.1\r\n",
+            "Host: {0}\r\n",
+            "Connection: close\r\n",
+            "Accept-Encoding: identity\r\n",
+            "\r\n"
             ),
             domain_name
         )
@@ -111,37 +117,56 @@ struct CheckResult {
     ok: bool,
     days: i64,
     domain_name: String,
-    checked_at: NaiveDateTime,
-    not_after: NaiveDateTime,
+    checked_at: DateTime<Utc>,
+    not_after: DateTime<Utc>,
+    seconds: i64,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CheckResultJSON {
+    ok: bool,
+    days: i64,
+    domain_name: String,
+    checked_at: String,
     seconds: i64,
 }
 
 impl CheckResult {
-    fn new(domain_name: &str, checked_at: NaiveDateTime) -> CheckResult {
+    fn new(domain_name: &str, checked_at: DateTime<Utc>) -> CheckResult {
         CheckResult {
             ok: false,
             checked_at,
             domain_name: domain_name.to_string(),
             days: 0,
-            not_after: NaiveDateTime::from_timestamp(0, 0),
+            not_after: Utc.timestamp(0, 0),
             seconds: 0,
+        }
+    }
+
+    fn to_json(&self) -> CheckResultJSON {
+        CheckResultJSON {
+            ok: self.ok,
+            days: self.days,
+            domain_name: self.domain_name.clone(),
+            checked_at: self.checked_at.to_rfc3339(),
+            seconds: self.seconds,
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use chrono::{NaiveDateTime, Utc};
+    use chrono::{Utc, DateTime, TimeZone};
 
     use crate::CheckClient;
 
-    fn checked_at_is_positive(checked_at: &NaiveDateTime) -> bool {
+    fn checked_at_is_positive(checked_at: &DateTime<Utc>) -> bool {
         checked_at.timestamp() > 0
     }
 
     #[test]
     fn test_good_certificate() {
-        let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
+        let now = Utc.timestamp(0, 0);
         let domain_name = "sha512.badssl.com";
 
         let client = CheckClient::new();
