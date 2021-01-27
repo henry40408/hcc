@@ -3,13 +3,18 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 use anyhow::Context;
-use chrono::{Utc, TimeZone, DateTime, SubsecRound};
+use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use clap::{App, Arg, SubCommand};
+use num_format::{Locale, ToFormattedString};
 use rustls::{ClientConfig, Session};
 use serde_derive::{Deserialize, Serialize};
+use std::fmt;
+use x509_parser::der_parser::nom::lib::std::fmt::{Display, Formatter};
 use x509_parser::parse_x509_certificate;
 
 const CHECK: &'static str = "check";
+
+const JSON: &'static str = "json";
 
 const DOMAIN_NAME: &'static str = "domain_name";
 
@@ -18,6 +23,13 @@ fn main() -> anyhow::Result<()> {
         .version("semantic-release")
         .author("Heng-Yi Wu <2316687+henry40408@users.noreply.github.com>")
         .about("Check expiration date of SSL certificate")
+        .arg(
+            Arg::with_name(JSON)
+                .long("json")
+                .takes_value(false)
+                .required(false)
+                .help("Print in JSON format"),
+        )
         .subcommand(
             SubCommand::with_name(CHECK)
                 .about("Check domain name(s) immediately")
@@ -34,8 +46,12 @@ fn main() -> anyhow::Result<()> {
         let client = CheckClient::new();
         match client.check_certificate(domain_name) {
             Ok(r) => {
-                let s = serde_json::to_string(&r.to_json())?;
-                println!("{0}", s);
+                if matches.is_present(JSON) {
+                    let s = serde_json::to_string(&r.to_json())?;
+                    println!("{0}", s);
+                } else {
+                    println!("{0}", r);
+                }
             }
             Err(e) => println!("{:?}", e),
         }
@@ -122,6 +138,34 @@ struct CheckResult {
     seconds: i64,
 }
 
+impl Display for CheckResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // [v] certificate of sha512.badssl.com expires in 512 days
+        // [x] certificate of expired.badssl.com is expired
+        let mut s = Vec::<String>::new();
+
+        if self.ok {
+            s.push("[v]".into());
+        } else {
+            s.push("[x]".into());
+        }
+
+        s.push(format!("certificate of {0}", self.domain_name));
+
+        if self.ok {
+            s.push(format!(
+                "expires in {0} days ({1} seconds)",
+                self.days.to_formatted_string(&Locale::en),
+                self.seconds.to_formatted_string(&Locale::en)
+            ));
+        } else {
+            s.push(format!("is expired"));
+        }
+
+        write!(f, "{}", s.join(" "))
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct CheckResultJSON {
     ok: bool,
@@ -156,7 +200,7 @@ impl CheckResult {
 
 #[cfg(test)]
 mod test {
-    use chrono::{Utc, DateTime, TimeZone};
+    use chrono::{DateTime, TimeZone, Utc};
 
     use crate::CheckClient;
 
