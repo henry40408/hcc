@@ -1,11 +1,13 @@
-use actix_web::middleware::Logger;
+use std::env;
+
 use actix_web::HttpServer;
-use clap::{Arg, SubCommand};
+use actix_web::middleware::Logger;
+use clap::{Arg, crate_version, SubCommand};
 use log::info;
 
 use potential_giggle::{CheckClient, CheckResultsJSON};
 
-use crate::server::{show_domain_name, SharedState};
+use crate::server::{SharedState, show_domain_name};
 
 mod server;
 
@@ -25,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let matches = clap::App::new("Potential-Giggle")
-        .version("semantic-release")
+        .version(crate_version!())
         .author("Heng-Yi Wu <2316687+henry40408@users.noreply.github.com>")
         .about("Check expiration date of SSL certificate")
         .arg(
@@ -92,9 +94,9 @@ async fn main() -> anyhow::Result<()> {
                 .wrap(Logger::default())
                 .service(show_domain_name)
         })
-        .bind(bind)?
-        .run()
-        .await?
+            .bind(bind)?
+            .run()
+            .await?
     }
 
     Ok(())

@@ -4,17 +4,25 @@ use chrono::{DateTime, TimeZone, Utc};
 use num_format::{Locale, ToFormattedString};
 use serde::{Deserialize, Serialize};
 
+/// Check result
 #[derive(Debug)]
 pub struct CheckResult {
+    /// True when SSL certificate is valid
     pub ok: bool,
+    /// When is domain name got checked
     pub checked_at: DateTime<Utc>,
+    /// Remaining days to the expiration date
     pub days: i64,
+    /// Domain name that got checked
     pub domain_name: String,
+    /// Exact expiration time in RFC3389 format
     pub expired_at: String,
+    /// Exact expiration time
     pub not_after: DateTime<Utc>,
 }
 
 impl CheckResult {
+    /// Create a result from domain name and when the check occurred
     pub fn new(domain_name: &str, checked_at: DateTime<Utc>) -> CheckResult {
         CheckResult {
             ok: false,
@@ -26,6 +34,7 @@ impl CheckResult {
         }
     }
 
+    /// Convert result to JSON
     pub fn to_json(&self) -> CheckResultJSON {
         CheckResultJSON {
             ok: self.ok,
@@ -65,13 +74,20 @@ impl fmt::Display for CheckResult {
     }
 }
 
+/// Check result in JSON format
 #[derive(Serialize, Deserialize)]
 pub struct CheckResultJSON {
+    /// True when SSL certificate is valid
     pub ok: bool,
+    /// When is the domain name got checked
     pub checked_at: String,
+    /// Remaining days to the expiration date
     pub days: i64,
+    /// Domain name that got checked
     pub domain_name: String,
+    /// Expiration time in RFC3389 format
     pub expired_at: String,
 }
 
+/// List of check result in JSON format
 pub type CheckResultsJSON = Vec<CheckResultJSON>;

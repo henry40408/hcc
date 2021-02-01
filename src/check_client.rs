@@ -10,11 +10,13 @@ use x509_parser::parse_x509_certificate;
 
 use crate::check_result::CheckResult;
 
+/// Client to check SSL certificate
 pub struct CheckClient {
     config: Arc<ClientConfig>,
 }
 
 impl CheckClient {
+    /// Create an instance of client
     pub fn new() -> Self {
         let mut config = rustls::ClientConfig::new();
         config
@@ -25,6 +27,7 @@ impl CheckClient {
         }
     }
 
+    /// Check SSL certificate of one domain name
     pub fn check_certificate(&self, domain_name: &str) -> anyhow::Result<CheckResult> {
         let checked_at = Utc::now().round_subsecs(0);
 
@@ -64,6 +67,7 @@ impl CheckClient {
         })
     }
 
+    /// Check SSL certificates of multiple domain names
     pub fn check_certificates<S: AsRef<str>>(
         domain_names: &[S],
     ) -> anyhow::Result<Vec<CheckResult>> {
