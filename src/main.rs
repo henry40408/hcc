@@ -1,11 +1,11 @@
-use actix_web::HttpServer;
 use actix_web::middleware::Logger;
+use actix_web::HttpServer;
 use clap::{Arg, SubCommand};
 use log::info;
 
 use potential_giggle::{CheckClient, CheckResultsJSON};
 
-use crate::server::show_domain_name;
+use crate::server::{show_domain_name, SharedState};
 
 mod server;
 
@@ -88,6 +88,7 @@ async fn main() -> anyhow::Result<()> {
 
         HttpServer::new(|| {
             actix_web::App::new()
+                .data(SharedState::new())
                 .wrap(Logger::default())
                 .service(show_domain_name)
         })
