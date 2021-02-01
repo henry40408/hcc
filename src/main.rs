@@ -264,7 +264,7 @@ mod test {
     #[test]
     fn test_check_certificates() {
         let domain_names = vec!["sha512.badssl.com", "expired.badssl.com"];
-        let results = CheckClient::check_certificates(domain_names).unwrap();
+        let results = CheckClient::check_certificates(domain_names.as_slice()).unwrap();
         assert_eq!(2, results.len());
         assert!(results.get(0).unwrap().ok);
         assert!(!results.get(1).unwrap().ok);
