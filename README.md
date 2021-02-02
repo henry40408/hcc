@@ -7,25 +7,24 @@ Potential Giggle is a SSL checking server.
 Running as Docker container:
 
 ```bash
-$ docker build -t henry40408/potential-giggle .
-$ docker run -it -p 9292:9292 henry40408/potential-giggle
+$ make build-docker-image
+$ docker run -it -p 9292:9292 henry40408/potential-giggle /potential-giggle serve
 ```
 
 Or run directly:
 
 ```bash
-$ bundle
-$ bundle exec rackup -o 0.0.0.0
+$ cargo run -- serve
 ```
 
 ## Usage
 
 ```bash
-$ curl www.lvh.me:9292/example.com
-{"ok":true,"days":10,"seconds":945198}
+$ curl :9292/sha512.badssl.com
+{"ok":true,"checked_at":"2021-02-01T09:29:26+00:00","days":765,"domain_name":"sha512.badssl.com","expired_at":"2023-03-08T12:00:00+00:00"}
 
-$ curl www.lvh.me:9292/expired.badssl.com
-{"ok":false}
+$ curl :9292/expired.badssl.com
+{"ok":false,"checked_at":"2021-02-01T09:29:45+00:00","days":0,"domain_name":"expired.badssl.com","expired_at":""}
 ```
 
 ## Contributing

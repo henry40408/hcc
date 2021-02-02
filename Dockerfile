@@ -1,14 +1,5 @@
-FROM ruby:2.7.1-alpine
+FROM scratch
 
-COPY Gemfile .
-COPY Gemfile.lock .
+COPY target/x86_64-unknown-linux-musl/release/potential-giggle /
 
-RUN apk add --no-cache g++ musl-dev make && \
-    bundle && \
-    apk del g++ musl-dev make
-
-COPY . .
-
-EXPOSE 9292
-
-CMD bundle exec rackup -o 0.0.0.0
+CMD ["/potential-giggle"]
