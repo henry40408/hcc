@@ -17,6 +17,11 @@ pub struct CheckClient {
 
 impl CheckClient {
     /// Create an instance of client
+    ///
+    /// ```
+    /// # use potential_giggle::CheckClient;
+    /// let client = CheckClient::new();
+    /// ```
     pub fn new() -> Self {
         let mut config = rustls::ClientConfig::new();
         config
@@ -28,6 +33,12 @@ impl CheckClient {
     }
 
     /// Check SSL certificate of one domain name
+    ///
+    /// ```
+    /// # use potential_giggle::CheckClient;
+    /// let client = CheckClient::new();
+    /// client.check_certificate("sha512.badssl.com");
+    /// ```
     pub fn check_certificate(&self, domain_name: &str) -> anyhow::Result<CheckResult> {
         let checked_at = Utc::now().round_subsecs(0);
 
@@ -68,6 +79,11 @@ impl CheckClient {
     }
 
     /// Check SSL certificates of multiple domain names
+    ///
+    /// ```
+    /// # use potential_giggle::CheckClient;
+    /// CheckClient::check_certificates(&["sha256.badssl.com", "sha256.badssl.com"]);
+    /// ```
     pub fn check_certificates<S: AsRef<str>>(
         domain_names: &[S],
     ) -> anyhow::Result<Vec<CheckResult>> {

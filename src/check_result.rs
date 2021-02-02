@@ -23,6 +23,12 @@ pub struct CheckResult {
 
 impl CheckResult {
     /// Create a result from domain name and when the check occurred
+    ///
+    /// ```
+    /// # use potential_giggle::CheckResult;
+    /// use chrono::Utc;
+    /// CheckResult::new("sha512.badssl.com", Utc::now());
+    /// ```
     pub fn new(domain_name: &str, checked_at: DateTime<Utc>) -> CheckResult {
         CheckResult {
             ok: false,
@@ -35,6 +41,13 @@ impl CheckResult {
     }
 
     /// Convert result to JSON
+    ///
+    /// ```
+    /// # use potential_giggle::CheckResult;
+    /// use chrono::Utc;
+    /// let result = CheckResult::new("sha512.badssl.com", Utc::now());
+    /// result.to_json();
+    /// ```
     pub fn to_json(&self) -> CheckResultJSON {
         CheckResultJSON {
             ok: self.ok,

@@ -1,13 +1,13 @@
 use std::env;
 
-use actix_web::HttpServer;
 use actix_web::middleware::Logger;
-use clap::{Arg, crate_version, SubCommand};
+use actix_web::HttpServer;
+use clap::{crate_version, Arg, SubCommand};
 use log::info;
 
 use potential_giggle::{CheckClient, CheckResultsJSON};
 
-use crate::server::{SharedState, show_domain_name};
+use crate::server::{show_domain_name, SharedState};
 
 mod server;
 
@@ -94,9 +94,9 @@ async fn main() -> anyhow::Result<()> {
                 .wrap(Logger::default())
                 .service(show_domain_name)
         })
-            .bind(bind)?
-            .run()
-            .await?
+        .bind(bind)?
+        .run()
+        .await?
     }
 
     Ok(())
