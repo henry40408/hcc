@@ -3,6 +3,7 @@ name = "potential-giggle"
 version = "1.0.0"
 authors = ["Heng-Yi Wu <2316687+henry40408@users.noreply.github.com>"]
 edition = "2018"
+description = "Check expiration date of SSL certificate"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
