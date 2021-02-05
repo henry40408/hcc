@@ -2,7 +2,7 @@ use std::env;
 
 use actix_web::middleware::Logger;
 use actix_web::HttpServer;
-use clap::{crate_version, Arg, SubCommand};
+use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, SubCommand};
 use log::info;
 
 use potential_giggle::{CheckClient, CheckResultsJSON};
@@ -26,10 +26,10 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "potential_giggle=info,actix_web=info");
     env_logger::init();
 
-    let matches = clap::App::new("Potential-Giggle")
+    let matches = clap::App::new(crate_name!())
         .version(crate_version!())
-        .author("Heng-Yi Wu <2316687+henry40408@users.noreply.github.com>")
-        .about("Check expiration date of SSL certificate")
+        .author(crate_authors!(","))
+        .about(crate_description!())
         .arg(
             Arg::with_name(JSON)
                 .long("json")
