@@ -8,22 +8,22 @@ Running as Docker container:
 
 ```bash
 $ make build-docker-image
-$ docker run -it -p 9292:9292 henry40408/potential-giggle /potential-giggle serve
+$ docker run -it -p 9292:9292 henry40408/potential-giggle /potential-giggle-server -b 0.0.0.0:9292docker run -it -p 9292:9292 henry40408/potential-giggle /potential-giggle-server -b 0.0.0.0:9292
 ```
 
 Or run directly:
 
 ```bash
-$ cargo run -- serve
+$ cargo run --bin potential-giggle-server
 ```
 
 ## Usage
 
 ```bash
-$ curl :9292/sha512.badssl.com
+$ curl 127.0.0.1:9292/sha512.badssl.com
 {"ok":true,"checked_at":"2021-02-01T09:29:26+00:00","days":765,"domain_name":"sha512.badssl.com","expired_at":"2023-03-08T12:00:00+00:00"}
 
-$ curl :9292/expired.badssl.com
+$ curl 127.0.0.1:9292/expired.badssl.com
 {"ok":false,"checked_at":"2021-02-01T09:29:45+00:00","days":0,"domain_name":"expired.badssl.com","expired_at":""}
 ```
 
