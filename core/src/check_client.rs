@@ -13,6 +13,7 @@ use crate::check_result::CheckResult;
 /// Client to check SSL certificate
 pub struct CheckClient {
     config: Arc<ClientConfig>,
+    grace_in_days: i64,
 }
 
 impl CheckClient {
@@ -23,12 +24,23 @@ impl CheckClient {
     /// let client = CheckClient::new();
     /// ```
     pub fn new() -> Self {
+        Self::new_with_grace_in_days(7)
+    }
+
+    /// Create an instance of client with grace period in days
+    ///
+    /// ```
+    /// # use potential_giggle::CheckClient;
+    /// let client = CheckClient::new_with_grace_in_days(100);
+    /// ```
+    pub fn new_with_grace_in_days(grace_in_days: i64) -> Self {
         let mut config = rustls::ClientConfig::new();
         config
             .root_store
             .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
         Self {
             config: Arc::new(config),
+            grace_in_days,
         }
     }
 
@@ -49,7 +61,7 @@ impl CheckClient {
 
         match tls.write(Self::build_http_headers(domain_name).as_bytes()) {
             Ok(_) => (),
-            Err(_) => return Ok(CheckResult::new(domain_name, checked_at)),
+            Err(_) => return Ok(CheckResult::new_expired(domain_name, checked_at)),
         };
 
         let certificates = tls
@@ -58,21 +70,23 @@ impl CheckClient {
             .with_context(|| format!("no peer certificates found for {0}", domain_name))?;
 
         let certificate = certificates
-            .last()
+            .first()
             .with_context(|| format!("no certificate found for {0}", domain_name))?;
 
         let not_after = match parse_x509_certificate(certificate.as_ref()) {
             Ok((_, cert)) => cert.validity().not_after,
-            Err(_) => return Ok(CheckResult::new(domain_name, checked_at)),
+            Err(_) => return Ok(CheckResult::default(domain_name, checked_at)),
         };
         let not_after = Utc.timestamp(not_after.timestamp(), 0);
 
         let duration = not_after - checked_at;
+        let days = duration.num_days();
         Ok(CheckResult {
-            ok: true,
+            ok: days > self.grace_in_days,
             checked_at,
             days: duration.num_days(),
             domain_name: domain_name.to_string(),
+            expired: false,
             expired_at: not_after.to_rfc3339(),
             not_after,
         })
@@ -82,12 +96,14 @@ impl CheckClient {
     ///
     /// ```
     /// # use potential_giggle::CheckClient;
-    /// CheckClient::check_certificates(&["sha256.badssl.com", "sha256.badssl.com"]);
+    /// let client = CheckClient::new();
+    /// client.check_certificates(&["sha256.badssl.com", "sha256.badssl.com"]);
     /// ```
     pub fn check_certificates<S: AsRef<str>>(
+        &self,
         domain_names: &[S],
     ) -> anyhow::Result<Vec<CheckResult>> {
-        let client = Arc::new(CheckClient::new());
+        let client = Arc::new(self);
 
         thread::scope(|s| {
             let mut handles = vec![];
@@ -135,31 +151,53 @@ mod test {
     fn test_good_certificate() {
         let now = Utc.timestamp(0, 0);
         let domain_name = "sha512.badssl.com";
-
         let client = CheckClient::new();
-        let resp = client.check_certificate(domain_name).unwrap();
-        assert!(resp.ok);
-        assert!(checked_at_is_positive(&resp.checked_at));
-        assert!(now < resp.not_after);
+        let result = client.check_certificate(domain_name).unwrap();
+        assert!(result.ok);
+        assert!(!result.expired);
+        assert!(checked_at_is_positive(&result.checked_at));
+        assert!(now < result.not_after);
     }
 
     #[test]
     fn test_bad_certificate() {
         let domain_name = "expired.badssl.com";
-
         let client = CheckClient::new();
-        let resp = client.check_certificate(domain_name).unwrap();
-        assert!(!resp.ok);
-        assert!(checked_at_is_positive(&resp.checked_at));
-        assert_eq!(0, resp.not_after.timestamp());
+        let result = client.check_certificate(domain_name).unwrap();
+        assert!(!result.ok);
+        assert!(result.expired);
+        assert!(checked_at_is_positive(&result.checked_at));
+        assert_eq!(0, result.not_after.timestamp());
     }
 
     #[test]
     fn test_check_certificates() {
         let domain_names = vec!["sha512.badssl.com", "expired.badssl.com"];
-        let results = CheckClient::check_certificates(domain_names.as_slice()).unwrap();
+        let client = CheckClient::new();
+        let results = client.check_certificates(domain_names.as_slice()).unwrap();
         assert_eq!(2, results.len());
-        assert!(results.get(0).unwrap().ok);
-        assert!(!results.get(1).unwrap().ok);
+
+        let result = results.get(0).unwrap();
+        assert!(result.ok);
+        assert!(!result.expired);
+
+        let result = results.get(1).unwrap();
+        assert!(!result.ok);
+        assert!(result.expired);
+    }
+
+    #[test]
+    fn test_check_certificate_with_grace_in_days() {
+        let domain_name = "sha512.badssl.com";
+
+        let client = CheckClient::new();
+        let result = client.check_certificate(domain_name).unwrap();
+        assert!(result.ok);
+        assert!(!result.expired);
+
+        let client = CheckClient::new_with_grace_in_days(result.days + 1);
+        let result = client.check_certificate(domain_name).unwrap();
+        assert!(!result.ok);
+        assert!(!result.expired);
     }
 }
