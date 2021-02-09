@@ -1,60 +1,59 @@
-use std::env;
-
-use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, SubCommand};
+use structopt::StructOpt;
 
 use potential_giggle::{CheckClient, CheckResultsJSON};
 
-const CHECK: &'static str = "check";
+#[derive(Debug, StructOpt)]
+#[structopt(author, about)]
+struct Opts {
+    #[structopt(short, long, help = "Print in JSON format")]
+    json: bool,
+    #[structopt(subcommand)]
+    command: Option<Command>,
+}
 
-const JSON: &'static str = "json";
-
-const DOMAIN_NAME: &'static str = "domain_name";
+#[derive(Debug, StructOpt)]
+enum Command {
+    #[structopt(about = "Check domain name(s) immediately")]
+    Check {
+        #[structopt(
+            short,
+            long = "grace",
+            help = "Grace period in days",
+            default_value = "7"
+        )]
+        grace_in_days: i64,
+        #[structopt(help = "One or many domain names to check")]
+        domain_names: Vec<String>,
+    },
+}
 
 fn main() -> anyhow::Result<()> {
-    let matches = clap::App::new(crate_name!())
-        .version(crate_version!())
-        .author(crate_authors!(","))
-        .about(crate_description!())
-        .arg(
-            Arg::with_name(JSON)
-                .long("json")
-                .takes_value(false)
-                .required(false)
-                .help("Print in JSON format"),
-        )
-        .subcommand(
-            SubCommand::with_name(CHECK)
-                .about("Check domain name(s) immediately")
-                .arg(
-                    Arg::with_name(DOMAIN_NAME)
-                        .min_values(1)
-                        .help("One or many domain names to check"),
-                ),
-        )
-        .get_matches();
+    let opts: Opts = Opts::from_args();
 
-    if let Some(ref m) = matches.subcommand_matches(CHECK) {
-        let domain_names: Vec<String> = m
-            .values_of(DOMAIN_NAME)
-            .expect("Domain name is not given")
-            .map(String::from)
-            .collect();
-        let results = CheckClient::check_certificates(&domain_names)?;
-        if matches.is_present(JSON) {
-            if results.len() > 1 {
-                let json: CheckResultsJSON = results.iter().map(|r| r.to_json()).collect();
-                let s = serde_json::to_string(&json)?;
-                println!("{0}", s);
+    match opts.command {
+        Some(Command::Check {
+            domain_names,
+            grace_in_days,
+        }) => {
+            let client = CheckClient::new_with_grace_in_days(grace_in_days);
+            let results = client.check_certificates(domain_names.as_slice())?;
+            if opts.json {
+                if results.len() > 1 {
+                    let json: CheckResultsJSON = results.iter().map(|r| r.to_json()).collect();
+                    let s = serde_json::to_string(&json)?;
+                    println!("{0}", s);
+                } else {
+                    let json = results.get(0).unwrap().to_json();
+                    let s = serde_json::to_string(&json)?;
+                    println!("{0}", s);
+                }
             } else {
-                let json = results.get(0).unwrap().to_json();
-                let s = serde_json::to_string(&json)?;
-                println!("{0}", s);
-            }
-        } else {
-            for r in results {
-                println!("{0}", r);
+                for r in results {
+                    println!("{0}", r);
+                }
             }
         }
+        None => {}
     }
 
     Ok(())
