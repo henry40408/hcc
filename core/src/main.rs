@@ -1,15 +1,8 @@
 use std::env;
 
-use actix_web::middleware::Logger;
-use actix_web::HttpServer;
 use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, SubCommand};
-use log::info;
 
 use potential_giggle::{CheckClient, CheckResultsJSON};
-
-use crate::server::{show_domain_name, SharedState};
-
-mod server;
 
 const CHECK: &'static str = "check";
 
@@ -17,15 +10,7 @@ const JSON: &'static str = "json";
 
 const DOMAIN_NAME: &'static str = "domain_name";
 
-const SERVE: &'static str = "serve";
-
-const BIND: &'static str = "bind";
-
-#[actix_web::main]
-async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "potential_giggle=info,actix_web=info");
-    env_logger::init();
-
+fn main() -> anyhow::Result<()> {
     let matches = clap::App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!(","))
@@ -45,15 +30,6 @@ async fn main() -> anyhow::Result<()> {
                         .min_values(1)
                         .help("One or many domain names to check"),
                 ),
-        )
-        .subcommand(
-            SubCommand::with_name(SERVE).about("Run a server").arg(
-                Arg::with_name(BIND)
-                    .short("b")
-                    .required(false)
-                    .help("host:port to listen to")
-                    .default_value("0.0.0.0:9292"),
-            ),
         )
         .get_matches();
 
@@ -79,24 +55,6 @@ async fn main() -> anyhow::Result<()> {
                 println!("{0}", r);
             }
         }
-    }
-
-    if let Some(ref m) = matches.subcommand_matches(SERVE) {
-        let bind: &str = m
-            .value_of(BIND)
-            .expect("host and port are required to bind to");
-
-        info!("listening on {0}...", bind);
-
-        HttpServer::new(|| {
-            actix_web::App::new()
-                .data(SharedState::new())
-                .wrap(Logger::default())
-                .service(show_domain_name)
-        })
-        .bind(bind)?
-        .run()
-        .await?
     }
 
     Ok(())
