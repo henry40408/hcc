@@ -1,3 +1,5 @@
+#[forbid(unsafe_code)]
+
 use structopt::StructOpt;
 
 use potential_giggle::{CheckClient, CheckResultJSON};
