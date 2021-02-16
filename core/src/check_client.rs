@@ -61,7 +61,7 @@ impl CheckClient {
 
         match tls.write(Self::build_http_headers(domain_name).as_bytes()) {
             Ok(_) => (),
-            Err(_) => return Ok(CheckResult::new_expired(domain_name, checked_at)),
+            Err(_) => return Ok(CheckResult::new_expired(domain_name, &checked_at)),
         };
 
         let certificates = tls
@@ -75,7 +75,7 @@ impl CheckClient {
 
         let not_after = match parse_x509_certificate(certificate.as_ref()) {
             Ok((_, cert)) => cert.validity().not_after,
-            Err(_) => return Ok(CheckResult::default(domain_name, checked_at)),
+            Err(_) => return Ok(CheckResult::default(domain_name, &checked_at)),
         };
         let not_after = Utc.timestamp(not_after.timestamp(), 0);
 
@@ -87,7 +87,6 @@ impl CheckClient {
             days: duration.num_days(),
             domain_name: domain_name.to_string(),
             expired: false,
-            expired_at: not_after.to_rfc3339(),
             not_after,
         })
     }
@@ -139,13 +138,9 @@ impl CheckClient {
 
 #[cfg(test)]
 mod test {
-    use chrono::{DateTime, TimeZone, Utc};
+    use chrono::{TimeZone, Utc};
 
     use crate::check_client::CheckClient;
-
-    fn checked_at_is_positive(checked_at: &DateTime<Utc>) -> bool {
-        checked_at.timestamp() > 0
-    }
 
     #[test]
     fn test_good_certificate() {
@@ -155,7 +150,7 @@ mod test {
         let result = client.check_certificate(domain_name).unwrap();
         assert!(result.ok);
         assert!(!result.expired);
-        assert!(checked_at_is_positive(&result.checked_at));
+        assert!(result.checked_at.timestamp() > 0);
         assert!(now < result.not_after);
     }
 
@@ -166,7 +161,7 @@ mod test {
         let result = client.check_certificate(domain_name).unwrap();
         assert!(!result.ok);
         assert!(result.expired);
-        assert!(checked_at_is_positive(&result.checked_at));
+        assert!(result.checked_at.timestamp() > 0);
         assert_eq!(0, result.not_after.timestamp());
     }
 

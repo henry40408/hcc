@@ -17,8 +17,6 @@ pub struct CheckResult {
     pub domain_name: String,
     /// Already expired?
     pub expired: bool,
-    /// Exact expiration time in RFC3389 format
-    pub expired_at: String,
     /// Exact expiration time
     pub not_after: DateTime<Utc>,
 }
@@ -29,16 +27,15 @@ impl CheckResult {
     /// ```
     /// # use potential_giggle::CheckResult;
     /// use chrono::Utc;
-    /// CheckResult::default("sha512.badssl.com", Utc::now());
+    /// CheckResult::default("sha512.badssl.com", &Utc::now());
     /// ```
-    pub fn default(domain_name: &str, checked_at: DateTime<Utc>) -> Self {
+    pub fn default(domain_name: &str, checked_at: &DateTime<Utc>) -> Self {
         CheckResult {
             ok: false,
-            checked_at,
+            checked_at: checked_at.clone(),
             domain_name: domain_name.to_string(),
             days: 0,
             expired: false,
-            expired_at: "".to_string(),
             not_after: Utc.timestamp(0, 0),
         }
     }
@@ -48,67 +45,51 @@ impl CheckResult {
     /// ```
     /// # use potential_giggle::CheckResult;
     /// use chrono::Utc;
-    /// CheckResult::new_expired("expired.badssl.com", Utc::now());
+    /// CheckResult::new_expired("expired.badssl.com", &Utc::now());
     /// ```
-    pub fn new_expired(domain_name: &str, checked_at: DateTime<Utc>) -> Self {
+    pub fn new_expired(domain_name: &str, checked_at: &DateTime<Utc>) -> Self {
         CheckResult {
             ok: false,
-            checked_at,
+            checked_at: checked_at.clone(),
             domain_name: domain_name.to_string(),
             days: 0,
             expired: true,
-            expired_at: "".to_string(),
             not_after: Utc.timestamp(0, 0),
-        }
-    }
-
-    /// Convert result to JSON
-    ///
-    /// ```
-    /// # use potential_giggle::CheckResult;
-    /// use chrono::Utc;
-    /// let result = CheckResult::default("sha512.badssl.com", Utc::now());
-    /// result.to_json();
-    /// ```
-    pub fn to_json(&self) -> CheckResultJSON {
-        CheckResultJSON {
-            ok: self.ok,
-            days: self.days,
-            domain_name: self.domain_name.clone(),
-            checked_at: self.checked_at.to_rfc3339(),
-            expired: self.expired,
-            expired_at: self.expired_at.clone(),
         }
     }
 }
 
 impl fmt::Display for CheckResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // [v] certificate of sha512.badssl.com expires in 512 days
-        // [x] certificate of expired.badssl.com is expired
-        let mut s = Vec::<String>::new();
+        // [v] certificate of sha512.badssl.com expires in 512 days (timestamp in RFC3339)
+        // [-] certificate of sha512.badssl.com expires in 512 days (timestamp in RFC3339)
+        // [x] certificate of expired.badssl.com has expired (timestamp in RFC3339)
+        let mut s = String::with_capacity(100);
 
         if self.expired {
-            s.push("[x]".into());
+            s.push_str("[x]");
         } else if self.ok {
-            s.push("[v]".into());
+            s.push_str("[v]");
         } else {
-            s.push("[-]".into());
+            s.push_str("[-]");
         }
 
-        s.push(format!("certificate of {0}", self.domain_name));
+        s.push(' ');
+
+        s.push_str(&format!("certificate of {0}", self.domain_name));
+
+        s.push(' ');
 
         if self.expired {
-            s.push(format!("is expired"));
+            s.push_str("has expired");
         } else {
-            s.push(format!(
-                "expires in {0} days ({1})",
-                self.days.to_formatted_string(&Locale::en),
-                self.expired_at
-            ));
+            let days = self.days.to_formatted_string(&Locale::en);
+            let ts = self.not_after.to_rfc3339();
+            let s2 = &format!("expires in {0} days ({1})", days, ts);
+            s.push_str(s2);
         }
 
-        write!(f, "{}", s.join(" "))
+        write!(f, "{}", s)
     }
 }
 
@@ -129,5 +110,76 @@ pub struct CheckResultJSON {
     pub expired_at: String,
 }
 
-/// List of check result in JSON format
-pub type CheckResultsJSON = Vec<CheckResultJSON>;
+impl CheckResultJSON {
+    /// Convert result to JSON
+    ///
+    /// ```
+    /// # use potential_giggle::{CheckResult, CheckResultJSON};
+    /// use chrono::Utc;
+    /// let result = CheckResult::default("sha512.badssl.com", &Utc::now());
+    /// CheckResultJSON::new(&result);
+    /// ```
+    pub fn new(result: &CheckResult) -> CheckResultJSON {
+        CheckResultJSON {
+            ok: result.ok,
+            days: result.days,
+            domain_name: result.domain_name.clone(),
+            checked_at: result.checked_at.to_rfc3339(),
+            expired: result.expired,
+            expired_at: result.not_after.to_rfc3339(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::CheckResult;
+    use chrono::{Duration, SubsecRound, Utc};
+
+    fn build_result() -> CheckResult {
+        let days = 512;
+        let now = Utc::now().round_subsecs(0);
+        let expired_at = now + Duration::days(days);
+        CheckResult {
+            ok: false,
+            checked_at: now,
+            days,
+            domain_name: "example.com".to_string(),
+            expired: false,
+            not_after: expired_at,
+        }
+    }
+
+    #[test]
+    fn test_display() {
+        let mut result = build_result();
+        result.ok = true;
+
+        let left = format!("{0}", result);
+        let right = format!(
+            "[v] certificate of example.com expires in 512 days ({0})",
+            result.not_after.to_rfc3339()
+        );
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_display_not_ok() {
+        let result = build_result();
+        let left = format!("{0}", result);
+        let right = format!(
+            "[-] certificate of example.com expires in 512 days ({0})",
+            result.not_after.to_rfc3339()
+        );
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_display_expired() {
+        let mut result = build_result();
+        result.expired = true;
+        let left = format!("{0}", result);
+        let right = "[x] certificate of example.com has expired";
+        assert_eq!(left, right);
+    }
+}
