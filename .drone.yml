@@ -1,0 +1,61 @@
+---
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: check
+    image: rust:1.49.0
+    commands:
+      - cargo check
+    volumes:
+      - name: cargo-registry
+        path: /usr/local/cargo/registry
+      - name: target
+        path: /drone/src/target
+  - name: test
+    image: rust:1.49.0
+    commands:
+      - cargo test
+    volumes:
+      - name: cargo-registry
+        path: /usr/local/cargo/registry
+      - name: target
+        path: /drone/src/target
+  - name: build-release
+    image: rust:1.49.0
+    commands:
+      - cargo build --release
+    volumes:
+      - name: cargo-registry
+        path: /usr/local/cargo/registry
+      - name: target
+        path: /drone/src/target
+  - name: build-musl-release
+    image: rust:1.49.0-alpine
+    commands:
+      - apk add --no-cache musl-dev
+      - rustup target add x86_64-unknown-linux-musl
+      - cargo build --release --target x86_64-unknown-linux-musl
+    volumes:
+      - name: cargo-registry
+        path: /usr/local/cargo/registry
+      - name: target
+        path: /drone/src/target
+  - name: check-musl-build
+    image: alpine:3
+    commands:
+      - apk add --no-cache file
+      - file target/x86_64-unknown-linux-musl/release/potential-giggle
+      - file target/x86_64-unknown-linux-musl/release/potential-giggle-server
+    volumes:
+      - name: cargo-registry
+        path: /usr/local/cargo/registry
+      - name: target
+        path: /drone/src/target
+
+volumes:
+  - name: cargo-registry
+    temp: {}
+  - name: target
+    temp: {}
