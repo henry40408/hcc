@@ -1,0 +1,33 @@
+---
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: test_check
+    image: rust:1.50.0-alpine
+    commands:
+      - apk add --no-cache musl-dev
+      - cargo check
+      - cargo test
+  - name: build-musl
+    image: rust:1.50.0-alpine
+    commands:
+      - apk add --no-cache musl-dev
+      - cargo build --release --target x86_64-unknown-linux-musl
+  - name: tags
+    image: alpine/git
+    commands:
+      - git rev-parse --short HEAD | tee .tags
+  - name: build-docker-image
+    image: plugins/docker
+    settings:
+      storage_driver: vfs
+      registry:
+        from_secret: registry
+      username:
+        from_secret: username
+      password:
+        from_secret: password
+      repo:
+        from_secret: repo
