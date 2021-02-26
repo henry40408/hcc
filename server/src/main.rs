@@ -1,5 +1,4 @@
 #[forbid(unsafe_code)]
-
 use crate::server::{show_domain_name, SharedState};
 use actix_web::{middleware, App, HttpServer};
 use log::info;

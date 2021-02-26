@@ -20,7 +20,7 @@ pub async fn show_domain_name(
     web::Path(domain_name): web::Path<String>,
 ) -> impl Responder {
     let client = &data.client;
-    let string = match client.check_certificate(&domain_name) {
+    let string = match client.check_certificate(&domain_name).await {
         Ok(r) => {
             let json = CheckResultJSON::new(&r);
             serde_json::to_string(&json)
