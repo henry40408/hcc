@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use chrono::{SubsecRound, TimeZone, Utc};
-use crossbeam_utils::thread;
 use rustls::{ClientConfig, Session};
 use x509_parser::parse_x509_certificate;
 
 use crate::check_result::CheckResult;
+use futures::{executor, future};
 
 /// Client to check SSL certificate
 pub struct CheckClient {
@@ -51,7 +51,7 @@ impl CheckClient {
     /// let client = CheckClient::new();
     /// client.check_certificate("sha512.badssl.com");
     /// ```
-    pub fn check_certificate(&self, domain_name: &str) -> anyhow::Result<CheckResult> {
+    pub async fn check_certificate(&self, domain_name: &str) -> anyhow::Result<CheckResult> {
         let checked_at = Utc::now().round_subsecs(0);
 
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain_name)?;
@@ -104,22 +104,20 @@ impl CheckClient {
     ) -> anyhow::Result<Vec<CheckResult>> {
         let client = Arc::new(self);
 
-        thread::scope(|s| {
-            let mut handles = vec![];
-            for domain_name in domain_names {
-                let domain_name = domain_name.as_ref();
-                let client = client.clone();
-                handles.push(s.spawn(move |_| client.check_certificate(&domain_name)));
-            }
+        let mut futs = vec![];
+        for domain_name in domain_names {
+            let domain_name = domain_name.as_ref();
+            let client = client.clone();
+            futs.push(client.check_certificate(domain_name));
+        }
 
-            let mut results = vec![];
-            for handle in handles {
-                results.push(handle.join().unwrap()?);
-            }
-
-            Ok(results)
-        })
-        .unwrap()
+        let resolved = executor::block_on(future::join_all(futs));
+        let mut results = vec![];
+        for result in resolved {
+            let result = result?;
+            results.push(result);
+        }
+        Ok(results)
     }
 
     fn build_http_headers(domain_name: &str) -> String {
@@ -142,31 +140,31 @@ mod test {
 
     use crate::check_client::CheckClient;
 
-    #[test]
-    fn test_good_certificate() {
+    #[tokio::test]
+    async fn test_good_certificate() {
         let now = Utc.timestamp(0, 0);
         let domain_name = "sha512.badssl.com";
         let client = CheckClient::new();
-        let result = client.check_certificate(domain_name).unwrap();
+        let result = client.check_certificate(domain_name).await.unwrap();
         assert!(result.ok);
         assert!(!result.expired);
         assert!(result.checked_at.timestamp() > 0);
         assert!(now < result.not_after);
     }
 
-    #[test]
-    fn test_bad_certificate() {
+    #[tokio::test]
+    async fn test_bad_certificate() {
         let domain_name = "expired.badssl.com";
         let client = CheckClient::new();
-        let result = client.check_certificate(domain_name).unwrap();
+        let result = client.check_certificate(domain_name).await.unwrap();
         assert!(!result.ok);
         assert!(result.expired);
         assert!(result.checked_at.timestamp() > 0);
         assert_eq!(0, result.not_after.timestamp());
     }
 
-    #[test]
-    fn test_check_certificates() {
+    #[tokio::test]
+    async fn test_check_certificates() {
         let domain_names = vec!["sha512.badssl.com", "expired.badssl.com"];
         let client = CheckClient::new();
         let results = client.check_certificates(domain_names.as_slice()).unwrap();
@@ -181,17 +179,17 @@ mod test {
         assert!(result.expired);
     }
 
-    #[test]
-    fn test_check_certificate_with_grace_in_days() {
+    #[tokio::test]
+    async fn test_check_certificate_with_grace_in_days() {
         let domain_name = "sha512.badssl.com";
 
         let client = CheckClient::new();
-        let result = client.check_certificate(domain_name).unwrap();
+        let result = client.check_certificate(domain_name).await.unwrap();
         assert!(result.ok);
         assert!(!result.expired);
 
         let client = CheckClient::new_with_grace_in_days(result.days + 1);
-        let result = client.check_certificate(domain_name).unwrap();
+        let result = client.check_certificate(domain_name).await.unwrap();
         assert!(!result.ok);
         assert!(!result.expired);
     }
