@@ -1,5 +1,7 @@
 # Potential Giggle
 
+[![Build Status](https://ci.h08.io/api/badges/henry40408/potential-giggle/status.svg)](https://ci.h08.io/henry40408/potential-giggle)
+
 Potential Giggle is a SSL checking server.
 
 ## Installation
