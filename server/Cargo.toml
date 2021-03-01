@@ -15,5 +15,5 @@ pretty_env_logger = "0.4.0"
 serde = { version = "1.0.123", features = ["derive"] }
 serde_derive = "1.0.123"
 structopt = "0.3.21"
-tokio = { version = "1", features = ["full"] }
-warp = "0.3"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
+warp = { version = "0.3", default-features = false }
