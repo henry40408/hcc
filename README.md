@@ -23,10 +23,10 @@ $ cargo run --bin potential-giggle-server
 
 ```bash
 $ curl 127.0.0.1:9292/sha512.badssl.com
-{"ok":true,"checked_at":"2021-02-01T09:29:26+00:00","days":765,"domain_name":"sha512.badssl.com","expired_at":"2023-03-08T12:00:00+00:00"}
+{"ok":true,"checked_at":"2021-03-01T12:39:01+00:00","days":395,"domain_name":"sha512.badssl.com","expired":false,"expired_at":"2022-04-01T12:00:00+00:00"}
 
 $ curl 127.0.0.1:9292/expired.badssl.com
-{"ok":false,"checked_at":"2021-02-01T09:29:45+00:00","days":0,"domain_name":"expired.badssl.com","expired_at":""}
+{"ok":false,"checked_at":"2021-03-01T12:39:22+00:00","days":0,"domain_name":"expired.badssl.com","expired":true,"expired_at":"1970-01-01T00:00:00+00:00"}
 ```
 
 ## Contributing
