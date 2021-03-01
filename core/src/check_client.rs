@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use chrono::{SubsecRound, TimeZone, Utc};
+use futures::{executor, future};
 use rustls::{ClientConfig, Session};
 use x509_parser::parse_x509_certificate;
 
 use crate::check_result::CheckResult;
-use futures::{executor, future};
 
 /// Client to check SSL certificate
 pub struct CheckClient {

@@ -133,8 +133,9 @@ impl CheckResultJSON {
 
 #[cfg(test)]
 mod test {
-    use crate::CheckResult;
     use chrono::{Duration, SubsecRound, Utc};
+
+    use crate::CheckResult;
 
     fn build_result() -> CheckResult {
         let days = 512;
