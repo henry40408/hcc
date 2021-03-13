@@ -1,8 +1,8 @@
-# Potential Giggle
+# hcc
 
-[![Build Status](https://ci.h08.io/api/badges/henry40408/potential-giggle/status.svg)](https://ci.h08.io/henry40408/potential-giggle)
+[![Build Status](https://ci.h08.io/api/badges/henry40408/hcc/status.svg)](https://ci.h08.io/henry40408/hcc)
 
-Potential Giggle is a SSL checking server.
+**H**TTPS **C**ertificate **C**heck
 
 ## Installation
 
@@ -10,13 +10,13 @@ Running as Docker container:
 
 ```bash
 $ make build-docker-image
-$ docker run -it -p 9292:9292 henry40408/potential-giggle /potential-giggle-server -b 0.0.0.0:9292docker run -it -p 9292:9292 henry40408/potential-giggle /potential-giggle-server -b 0.0.0.0:9292
+$ docker run -it -p 9292:9292 henry40408/hcc /hcc-server -b 0.0.0.0:9292docker run -it -p 9292:9292 henry40408/hcc /hcc-server -b 0.0.0.0:9292
 ```
 
 Or run directly:
 
 ```bash
-$ cargo run --bin potential-giggle-server
+$ cargo run --bin hcc-server
 ```
 
 ## Usage

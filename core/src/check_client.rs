@@ -20,7 +20,7 @@ impl CheckClient {
     /// Create an instance of client
     ///
     /// ```
-    /// # use potential_giggle::CheckClient;
+    /// # use hcc::CheckClient;
     /// let client = CheckClient::new();
     /// ```
     pub fn new() -> Self {
@@ -30,7 +30,7 @@ impl CheckClient {
     /// Create an instance of client with grace period in days
     ///
     /// ```
-    /// # use potential_giggle::CheckClient;
+    /// # use hcc::CheckClient;
     /// let client = CheckClient::new_with_grace_in_days(100);
     /// ```
     pub fn new_with_grace_in_days(grace_in_days: i64) -> Self {
@@ -47,7 +47,7 @@ impl CheckClient {
     /// Check SSL certificate of one domain name
     ///
     /// ```
-    /// # use potential_giggle::CheckClient;
+    /// # use hcc::CheckClient;
     /// let client = CheckClient::new();
     /// client.check_certificate("sha512.badssl.com");
     /// ```
@@ -61,7 +61,7 @@ impl CheckClient {
 
         match tls.write(Self::build_http_headers(domain_name).as_bytes()) {
             Ok(_) => (),
-            Err(_) => return Ok(CheckResult::new_expired(domain_name, &checked_at)),
+            Err(_) => return Ok(CheckResult::expired(domain_name, &checked_at)),
         };
 
         let certificates = tls
@@ -75,7 +75,7 @@ impl CheckClient {
 
         let not_after = match parse_x509_certificate(certificate.as_ref()) {
             Ok((_, cert)) => cert.validity().not_after,
-            Err(_) => return Ok(CheckResult::default(domain_name, &checked_at)),
+            Err(_) => return Ok(CheckResult::default()),
         };
         let not_after = Utc.timestamp(not_after.timestamp(), 0);
 
@@ -83,18 +83,18 @@ impl CheckClient {
         let days = duration.num_days();
         Ok(CheckResult {
             ok: days > self.grace_in_days,
-            checked_at,
+            checked_at: checked_at.timestamp(),
             days: duration.num_days(),
             domain_name: domain_name.to_string(),
-            expired: false,
-            not_after,
+            not_after: not_after.timestamp(),
+            ..Default::default()
         })
     }
 
     /// Check SSL certificates of multiple domain names
     ///
     /// ```
-    /// # use potential_giggle::CheckClient;
+    /// # use hcc::CheckClient;
     /// let client = CheckClient::new();
     /// client.check_certificates(&["sha256.badssl.com", "sha256.badssl.com"]);
     /// ```
@@ -148,8 +148,8 @@ mod test {
         let result = client.check_certificate(domain_name).await.unwrap();
         assert!(result.ok);
         assert!(!result.expired);
-        assert!(result.checked_at.timestamp() > 0);
-        assert!(now < result.not_after);
+        assert!(result.checked_at > 0);
+        assert!(now < Utc.timestamp(result.not_after, 0));
     }
 
     #[tokio::test]
@@ -159,8 +159,8 @@ mod test {
         let result = client.check_certificate(domain_name).await.unwrap();
         assert!(!result.ok);
         assert!(result.expired);
-        assert!(result.checked_at.timestamp() > 0);
-        assert_eq!(0, result.not_after.timestamp());
+        assert!(result.checked_at > 0);
+        assert_eq!(0, result.not_after);
     }
 
     #[tokio::test]

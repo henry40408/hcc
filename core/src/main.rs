@@ -1,7 +1,7 @@
 #[forbid(unsafe_code)]
 use structopt::StructOpt;
 
-use potential_giggle::{CheckClient, CheckResultJSON};
+use hcc::{CheckClient, CheckResultJSON};
 
 #[derive(Debug, StructOpt)]
 #[structopt(author, about)]
