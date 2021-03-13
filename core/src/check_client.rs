@@ -9,11 +9,27 @@ use rustls::{ClientConfig, Session};
 use x509_parser::parse_x509_certificate;
 
 use crate::check_result::CheckResult;
+use std::time::Instant;
 
 /// Client to check SSL certificate
 pub struct CheckClient {
     config: Arc<ClientConfig>,
+    elapsed: bool,
     grace_in_days: i64,
+}
+
+impl Default for CheckClient {
+    fn default() -> CheckClient {
+        let mut config = rustls::ClientConfig::new();
+        config
+            .root_store
+            .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+        CheckClient {
+            config: Arc::new(config),
+            elapsed: false,
+            grace_in_days: 7,
+        }
+    }
 }
 
 impl CheckClient {
@@ -24,24 +40,16 @@ impl CheckClient {
     /// let client = CheckClient::new();
     /// ```
     pub fn new() -> Self {
-        Self::new_with_grace_in_days(7)
+        CheckClient::default()
     }
 
-    /// Create an instance of client with grace period in days
+    /// Create an instance of client with builder
     ///
     /// ```
     /// # use hcc::CheckClient;
-    /// let client = CheckClient::new_with_grace_in_days(100);
     /// ```
-    pub fn new_with_grace_in_days(grace_in_days: i64) -> Self {
-        let mut config = rustls::ClientConfig::new();
-        config
-            .root_store
-            .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
-        Self {
-            config: Arc::new(config),
-            grace_in_days,
-        }
+    pub fn builder() -> CheckClientBuilder {
+        CheckClientBuilder::default()
     }
 
     /// Check SSL certificate of one domain name
@@ -59,10 +67,12 @@ impl CheckClient {
         let mut sock = TcpStream::connect(format!("{0}:443", domain_name))?;
         let mut tls = rustls::Stream::new(&mut sess, &mut sock);
 
+        let origin = Instant::now();
         match tls.write(Self::build_http_headers(domain_name).as_bytes()) {
             Ok(_) => (),
             Err(_) => return Ok(CheckResult::expired(domain_name, &checked_at)),
         };
+        let elapsed = Instant::now() - origin;
 
         let certificates = tls
             .sess
@@ -87,6 +97,7 @@ impl CheckClient {
             days: duration.num_days(),
             domain_name: domain_name.to_string(),
             not_after: not_after.timestamp(),
+            elapsed: if self.elapsed { elapsed.as_millis() } else { 0 },
             ..Default::default()
         })
     }
@@ -131,6 +142,32 @@ impl CheckClient {
             ),
             domain_name
         )
+    }
+}
+
+#[derive(Default)]
+pub struct CheckClientBuilder {
+    elapsed: bool,
+    grace_in_days: i64,
+}
+
+impl CheckClientBuilder {
+    pub fn elapsed(&mut self, elapsed: bool) -> &mut Self {
+        self.elapsed = elapsed;
+        self
+    }
+
+    pub fn grace_in_days(&mut self, grace_in_days: i64) -> &mut Self {
+        self.grace_in_days = grace_in_days;
+        self
+    }
+
+    pub fn build(&self) -> CheckClient {
+        CheckClient {
+            elapsed: self.elapsed,
+            grace_in_days: self.grace_in_days,
+            ..Default::default()
+        }
     }
 }
 
@@ -188,7 +225,9 @@ mod test {
         assert!(result.ok);
         assert!(!result.expired);
 
-        let client = CheckClient::new_with_grace_in_days(result.days + 1);
+        let client = CheckClient::builder()
+            .grace_in_days(result.days + 1)
+            .build();
         let result = client.check_certificate(domain_name).await.unwrap();
         assert!(!result.ok);
         assert!(!result.expired);
