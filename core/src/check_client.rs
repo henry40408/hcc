@@ -20,7 +20,7 @@ impl CheckClient {
     /// Create an instance of client
     ///
     /// ```
-    /// # use potential_giggle::CheckClient;
+    /// # use hcc::CheckClient;
     /// let client = CheckClient::new();
     /// ```
     pub fn new() -> Self {
@@ -30,7 +30,7 @@ impl CheckClient {
     /// Create an instance of client with grace period in days
     ///
     /// ```
-    /// # use potential_giggle::CheckClient;
+    /// # use hcc::CheckClient;
     /// let client = CheckClient::new_with_grace_in_days(100);
     /// ```
     pub fn new_with_grace_in_days(grace_in_days: i64) -> Self {
@@ -47,7 +47,7 @@ impl CheckClient {
     /// Check SSL certificate of one domain name
     ///
     /// ```
-    /// # use potential_giggle::CheckClient;
+    /// # use hcc::CheckClient;
     /// let client = CheckClient::new();
     /// client.check_certificate("sha512.badssl.com");
     /// ```
@@ -94,7 +94,7 @@ impl CheckClient {
     /// Check SSL certificates of multiple domain names
     ///
     /// ```
-    /// # use potential_giggle::CheckClient;
+    /// # use hcc::CheckClient;
     /// let client = CheckClient::new();
     /// client.check_certificates(&["sha256.badssl.com", "sha256.badssl.com"]);
     /// ```

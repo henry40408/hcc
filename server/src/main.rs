@@ -9,7 +9,7 @@ use serde::Serialize;
 use structopt::StructOpt;
 use warp::Filter;
 
-use potential_giggle::{CheckClient, CheckResultJSON};
+use hcc::{CheckClient, CheckResultJSON};
 
 #[derive(Debug, StructOpt)]
 #[structopt(author, about)]
@@ -53,7 +53,7 @@ fn with_client(
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     if env::var_os("RUST_LOG").is_none() {
-        env::set_var("RUST_LOG", "potential_giggle_server=info");
+        env::set_var("RUST_LOG", "hcc_server=info");
     }
     pretty_env_logger::init();
 
@@ -66,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
 
     let routes = warp::any()
         .and(show_domain_name)
-        .with(warp::log("potential_giggle_server"));
+        .with(warp::log("hcc_server"));
 
     let addr: SocketAddr = opts.bind.parse()?;
     info!("Served on {0}", opts.bind);

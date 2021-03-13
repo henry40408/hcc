@@ -1,5 +1,5 @@
 FROM scratch
 
-COPY target/x86_64-unknown-linux-musl/release/potential-giggle-server /
+COPY target/x86_64-unknown-linux-musl/release/hcc-server /
 
-CMD ["/potential-giggle-server"]
+CMD ["/hcc-server"]

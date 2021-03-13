@@ -25,7 +25,7 @@ impl CheckResult {
     /// Create a result from domain name and when the check occurred
     ///
     /// ```
-    /// # use potential_giggle::CheckResult;
+    /// # use hcc::CheckResult;
     /// use chrono::Utc;
     /// CheckResult::default("sha512.badssl.com", &Utc::now());
     /// ```
@@ -43,7 +43,7 @@ impl CheckResult {
     /// Create a result from expired domain name and when the check occurred
     ///
     /// ```
-    /// # use potential_giggle::CheckResult;
+    /// # use hcc::CheckResult;
     /// use chrono::Utc;
     /// CheckResult::new_expired("expired.badssl.com", &Utc::now());
     /// ```
@@ -114,7 +114,7 @@ impl CheckResultJSON {
     /// Convert result to JSON
     ///
     /// ```
-    /// # use potential_giggle::{CheckResult, CheckResultJSON};
+    /// # use hcc::{CheckResult, CheckResultJSON};
     /// use chrono::Utc;
     /// let result = CheckResult::default("sha512.badssl.com", &Utc::now());
     /// CheckResultJSON::new(&result);
