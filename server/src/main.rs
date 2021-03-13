@@ -14,12 +14,8 @@ use hcc::{CheckClient, CheckResultJSON};
 #[derive(Debug, StructOpt)]
 #[structopt(author, about)]
 struct Opts {
-    #[structopt(
-        short,
-        long,
-        help = "host:port to be bound to the server",
-        default_value = "127.0.0.1:9292"
-    )]
+    /// host:port to be bound to the server
+    #[structopt(short, long, default_value = "127.0.0.1:9292")]
     bind: String,
 }
 

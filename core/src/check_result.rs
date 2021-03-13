@@ -19,6 +19,8 @@ pub struct CheckResult {
     pub expired: bool,
     /// Exact expiration time in seconds since Unix epoch
     pub not_after: i64,
+    /// Elapsed time in milliseconds
+    pub elapsed: u128,
 }
 
 impl CheckResult {
@@ -65,8 +67,11 @@ impl fmt::Display for CheckResult {
         } else {
             let days = self.days.to_formatted_string(&Locale::en);
             let ts = Utc.timestamp(self.not_after, 0).to_rfc3339();
-            let s2 = &format!("expires in {0} days ({1})", days, ts);
-            s.push_str(s2);
+            s.push_str(&format!("expires in {0} days ({1})", days, ts));
+        }
+
+        if self.elapsed > 0 {
+            s.push_str(&format!(", {0}ms elapsed", self.elapsed));
         }
 
         write!(f, "{}", s)
@@ -74,7 +79,7 @@ impl fmt::Display for CheckResult {
 }
 
 /// Check result in JSON format
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct CheckResultJSON {
     /// True when SSL certificate is valid in grace in period
     pub ok: bool,
@@ -88,6 +93,8 @@ pub struct CheckResultJSON {
     pub expired: bool,
     /// Expiration time in RFC3389 format
     pub expired_at: String,
+    /// Elapsed time in milliseconds
+    pub elapsed: u128,
 }
 
 impl CheckResultJSON {
@@ -111,6 +118,7 @@ impl CheckResultJSON {
             checked_at: Utc.timestamp(result.checked_at, 0).to_rfc3339(),
             expired: result.expired,
             expired_at: Utc.timestamp(result.not_after, 0).to_rfc3339(),
+            elapsed: result.elapsed,
         }
     }
 }
