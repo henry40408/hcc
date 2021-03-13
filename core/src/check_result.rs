@@ -5,56 +5,36 @@ use num_format::{Locale, ToFormattedString};
 use serde::{Deserialize, Serialize};
 
 /// Check result
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CheckResult {
     /// True when SSL certificate is valid in grace period of days
     pub ok: bool,
-    /// When is domain name got checked
-    pub checked_at: DateTime<Utc>,
+    /// When is domain name got checked in seconds since Unix epoch
+    pub checked_at: i64,
     /// Remaining days to the expiration date
     pub days: i64,
     /// Domain name that got checked
     pub domain_name: String,
     /// Already expired?
     pub expired: bool,
-    /// Exact expiration time
-    pub not_after: DateTime<Utc>,
+    /// Exact expiration time in seconds since Unix epoch
+    pub not_after: i64,
 }
 
 impl CheckResult {
-    /// Create a result from domain name and when the check occurred
-    ///
-    /// ```
-    /// # use hcc::CheckResult;
-    /// use chrono::Utc;
-    /// CheckResult::default("sha512.badssl.com", &Utc::now());
-    /// ```
-    pub fn default(domain_name: &str, checked_at: &DateTime<Utc>) -> Self {
-        CheckResult {
-            ok: false,
-            checked_at: checked_at.clone(),
-            domain_name: domain_name.to_string(),
-            days: 0,
-            expired: false,
-            not_after: Utc.timestamp(0, 0),
-        }
-    }
-
     /// Create a result from expired domain name and when the check occurred
     ///
     /// ```
     /// # use hcc::CheckResult;
     /// use chrono::Utc;
-    /// CheckResult::new_expired("expired.badssl.com", &Utc::now());
+    /// CheckResult::expired("expired.badssl.com", &Utc::now());
     /// ```
-    pub fn new_expired(domain_name: &str, checked_at: &DateTime<Utc>) -> Self {
+    pub fn expired(domain_name: &str, checked_at: &DateTime<Utc>) -> Self {
         CheckResult {
-            ok: false,
-            checked_at: checked_at.clone(),
+            checked_at: checked_at.timestamp(),
             domain_name: domain_name.to_string(),
-            days: 0,
             expired: true,
-            not_after: Utc.timestamp(0, 0),
+            ..Default::default()
         }
     }
 }
@@ -84,7 +64,7 @@ impl fmt::Display for CheckResult {
             s.push_str("has expired");
         } else {
             let days = self.days.to_formatted_string(&Locale::en);
-            let ts = self.not_after.to_rfc3339();
+            let ts = Utc.timestamp(self.not_after, 0).to_rfc3339();
             let s2 = &format!("expires in {0} days ({1})", days, ts);
             s.push_str(s2);
         }
@@ -116,7 +96,11 @@ impl CheckResultJSON {
     /// ```
     /// # use hcc::{CheckResult, CheckResultJSON};
     /// use chrono::Utc;
-    /// let result = CheckResult::default("sha512.badssl.com", &Utc::now());
+    /// let result = CheckResult {
+    ///     domain_name: "sha512.badssl.com".into(),
+    ///     checked_at: Utc::now().timestamp(),
+    ///     ..Default::default()
+    /// };
     /// CheckResultJSON::new(&result);
     /// ```
     pub fn new(result: &CheckResult) -> CheckResultJSON {
@@ -124,16 +108,16 @@ impl CheckResultJSON {
             ok: result.ok,
             days: result.days,
             domain_name: result.domain_name.clone(),
-            checked_at: result.checked_at.to_rfc3339(),
+            checked_at: Utc.timestamp(result.checked_at, 0).to_rfc3339(),
             expired: result.expired,
-            expired_at: result.not_after.to_rfc3339(),
+            expired_at: Utc.timestamp(result.not_after, 0).to_rfc3339(),
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use chrono::{Duration, SubsecRound, Utc};
+    use chrono::{Duration, SubsecRound, TimeZone, Utc};
 
     use crate::CheckResult;
 
@@ -142,12 +126,11 @@ mod test {
         let now = Utc::now().round_subsecs(0);
         let expired_at = now + Duration::days(days);
         CheckResult {
-            ok: false,
-            checked_at: now,
+            checked_at: now.timestamp(),
             days,
             domain_name: "example.com".to_string(),
-            expired: false,
-            not_after: expired_at,
+            not_after: expired_at.timestamp(),
+            ..Default::default()
         }
     }
 
@@ -159,7 +142,7 @@ mod test {
         let left = format!("{0}", result);
         let right = format!(
             "[v] certificate of example.com expires in 512 days ({0})",
-            result.not_after.to_rfc3339()
+            Utc.timestamp(result.not_after, 0).to_rfc3339()
         );
         assert_eq!(left, right);
     }
@@ -170,7 +153,7 @@ mod test {
         let left = format!("{0}", result);
         let right = format!(
             "[-] certificate of example.com expires in 512 days ({0})",
-            result.not_after.to_rfc3339()
+            Utc.timestamp(result.not_after, 0).to_rfc3339()
         );
         assert_eq!(left, right);
     }
