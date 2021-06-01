@@ -3,20 +3,49 @@ use std::fmt;
 use chrono::{DateTime, TimeZone, Utc};
 use num_format::{Locale, ToFormattedString};
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
+
+/// State of Certificate
+#[derive(Debug)]
+pub enum CheckState {
+    /// Default state
+    Unknown,
+    /// Certificate is valid
+    Ok,
+    /// Certificate is going to expire soon
+    Warning,
+    /// Certificate expired
+    Expired,
+}
+
+impl Default for CheckState {
+    fn default() -> Self {
+        CheckState::Unknown
+    }
+}
+
+impl fmt::Display for CheckState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            CheckState::Unknown => write!(f, "Unknown"),
+            CheckState::Ok => write!(f, "OK"),
+            CheckState::Warning => write!(f, "WARNING"),
+            CheckState::Expired => write!(f, "EXPIPRED"),
+        }
+    }
+}
 
 /// Check result
 #[derive(Debug, Default)]
 pub struct CheckResult {
-    /// True when SSL certificate is valid in grace period of days
-    pub ok: bool,
+    /// State of certificate
+    pub state: CheckState,
     /// When is domain name got checked in seconds since Unix epoch
     pub checked_at: i64,
     /// Remaining days to the expiration date
     pub days: i64,
     /// Domain name that got checked
     pub domain_name: String,
-    /// Already expired?
-    pub expired: bool,
     /// Exact expiration time in seconds since Unix epoch
     pub not_after: i64,
     /// Elapsed time in milliseconds
@@ -33,9 +62,9 @@ impl CheckResult {
     /// ```
     pub fn expired(domain_name: &str, checked_at: &DateTime<Utc>) -> Self {
         CheckResult {
+            state: CheckState::Expired,
             checked_at: checked_at.timestamp(),
             domain_name: domain_name.to_string(),
-            expired: true,
             ..Default::default()
         }
     }
@@ -48,13 +77,12 @@ impl fmt::Display for CheckResult {
         // [x] certificate of expired.badssl.com has expired (timestamp in RFC3339)
         let mut s = String::with_capacity(100);
 
-        if self.expired {
-            s.push_str("[x]");
-        } else if self.ok {
-            s.push_str("[v]");
-        } else {
-            s.push_str("[-]");
-        }
+        match self.state {
+            CheckState::Unknown => s.push_str("[?]"),
+            CheckState::Ok => s.push_str("[v]"),
+            CheckState::Warning => s.push_str("[-]"),
+            CheckState::Expired => s.push_str("[x]"),
+        };
 
         s.push(' ');
 
@@ -62,7 +90,7 @@ impl fmt::Display for CheckResult {
 
         s.push(' ');
 
-        if self.expired {
+        if matches!(self.state, CheckState::Expired) {
             s.push_str("has expired");
         } else {
             let days = self.days.to_formatted_string(&Locale::en);
@@ -81,16 +109,14 @@ impl fmt::Display for CheckResult {
 /// Check result in JSON format
 #[derive(Default, Serialize, Deserialize)]
 pub struct CheckResultJSON {
-    /// True when SSL certificate is valid in grace in period
-    pub ok: bool,
+    /// State of certificate
+    pub state: String,
     /// When is the domain name got checked
     pub checked_at: String,
     /// Remaining days to the expiration date
     pub days: i64,
     /// Domain name that got checked
     pub domain_name: String,
-    /// Already expired?
-    pub expired: bool,
     /// Expiration time in RFC3389 format
     pub expired_at: String,
     /// Elapsed time in milliseconds
@@ -112,11 +138,10 @@ impl CheckResultJSON {
     /// ```
     pub fn new(result: &CheckResult) -> CheckResultJSON {
         CheckResultJSON {
-            ok: result.ok,
+            state: result.state.to_string(),
             days: result.days,
             domain_name: result.domain_name.clone(),
             checked_at: Utc.timestamp(result.checked_at, 0).to_rfc3339(),
-            expired: result.expired,
             expired_at: Utc.timestamp(result.not_after, 0).to_rfc3339(),
             elapsed: result.elapsed,
         }
@@ -127,6 +152,7 @@ impl CheckResultJSON {
 mod test {
     use chrono::{Duration, SubsecRound, TimeZone, Utc};
 
+    use crate::check_result::CheckState;
     use crate::CheckResult;
 
     fn build_result() -> CheckResult {
@@ -145,7 +171,7 @@ mod test {
     #[test]
     fn test_display() {
         let mut result = build_result();
-        result.ok = true;
+        result.state = CheckState::Ok;
 
         let left = format!("{0}", result);
         let right = format!(
@@ -157,7 +183,8 @@ mod test {
 
     #[test]
     fn test_display_not_ok() {
-        let result = build_result();
+        let mut result = build_result();
+        result.state = CheckState::Warning;
         let left = format!("{0}", result);
         let right = format!(
             "[-] certificate of example.com expires in 512 days ({0})",
@@ -169,7 +196,7 @@ mod test {
     #[test]
     fn test_display_expired() {
         let mut result = build_result();
-        result.expired = true;
+        result.state = CheckState::Expired;
         let left = format!("{0}", result);
         let right = "[x] certificate of example.com has expired";
         assert_eq!(left, right);

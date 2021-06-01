@@ -3,16 +3,17 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 use anyhow::Context;
-use chrono::{SubsecRound, TimeZone, Utc};
+use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use futures::{executor, future};
 use rustls::{ClientConfig, Session};
 use x509_parser::parse_x509_certificate;
 
-use crate::check_result::CheckResult;
+use crate::check_result::{CheckResult, CheckState};
 use std::time::Instant;
 
 /// Client to check SSL certificate
 pub struct CheckClient {
+    checked_at: DateTime<Utc>,
     config: Arc<ClientConfig>,
     elapsed: bool,
     grace_in_days: i64,
@@ -25,6 +26,7 @@ impl Default for CheckClient {
             .root_store
             .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
         CheckClient {
+            checked_at: Utc::now().round_subsecs(0),
             config: Arc::new(config),
             elapsed: false,
             grace_in_days: 7,
@@ -60,8 +62,6 @@ impl CheckClient {
     /// client.check_certificate("sha512.badssl.com");
     /// ```
     pub async fn check_certificate(&self, domain_name: &str) -> anyhow::Result<CheckResult> {
-        let checked_at = Utc::now().round_subsecs(0);
-
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain_name)?;
         let mut sess = rustls::ClientSession::new(&self.config, dns_name);
         let mut sock = TcpStream::connect(format!("{0}:443", domain_name))?;
@@ -70,7 +70,7 @@ impl CheckClient {
         let origin = Instant::now();
         match tls.write(Self::build_http_headers(domain_name).as_bytes()) {
             Ok(_) => (),
-            Err(_) => return Ok(CheckResult::expired(domain_name, &checked_at)),
+            Err(_) => return Ok(CheckResult::expired(domain_name, &self.checked_at)),
         };
         let elapsed = Instant::now() - origin;
 
@@ -89,11 +89,16 @@ impl CheckClient {
         };
         let not_after = Utc.timestamp(not_after.timestamp(), 0);
 
-        let duration = not_after - checked_at;
+        let duration = not_after - self.checked_at;
         let days = duration.num_days();
+        let state = if days > self.grace_in_days {
+            CheckState::Ok
+        } else {
+            CheckState::Warning
+        };
         Ok(CheckResult {
-            ok: days > self.grace_in_days,
-            checked_at: checked_at.timestamp(),
+            state,
+            checked_at: self.checked_at.timestamp(),
             days: duration.num_days(),
             domain_name: domain_name.to_string(),
             not_after: not_after.timestamp(),
@@ -176,6 +181,7 @@ mod test {
     use chrono::{TimeZone, Utc};
 
     use crate::check_client::CheckClient;
+    use crate::check_result::CheckState;
 
     #[tokio::test]
     async fn test_good_certificate() {
@@ -183,8 +189,7 @@ mod test {
         let domain_name = "sha512.badssl.com";
         let client = CheckClient::new();
         let result = client.check_certificate(domain_name).await.unwrap();
-        assert!(result.ok);
-        assert!(!result.expired);
+        assert!(matches!(result.state, CheckState::Ok));
         assert!(result.checked_at > 0);
         assert!(now < Utc.timestamp(result.not_after, 0));
     }
@@ -194,8 +199,7 @@ mod test {
         let domain_name = "expired.badssl.com";
         let client = CheckClient::new();
         let result = client.check_certificate(domain_name).await.unwrap();
-        assert!(!result.ok);
-        assert!(result.expired);
+        assert!(matches!(result.state, CheckState::Expired));
         assert!(result.checked_at > 0);
         assert_eq!(0, result.not_after);
     }
@@ -208,12 +212,10 @@ mod test {
         assert_eq!(2, results.len());
 
         let result = results.get(0).unwrap();
-        assert!(result.ok);
-        assert!(!result.expired);
+        assert!(matches!(result.state, CheckState::Ok));
 
         let result = results.get(1).unwrap();
-        assert!(!result.ok);
-        assert!(result.expired);
+        assert!(matches!(result.state, CheckState::Expired));
     }
 
     #[tokio::test]
@@ -222,14 +224,12 @@ mod test {
 
         let client = CheckClient::new();
         let result = client.check_certificate(domain_name).await.unwrap();
-        assert!(result.ok);
-        assert!(!result.expired);
+        assert!(matches!(result.state, CheckState::Ok));
 
         let client = CheckClient::builder()
             .grace_in_days(result.days + 1)
             .build();
         let result = client.check_certificate(domain_name).await.unwrap();
-        assert!(!result.ok);
-        assert!(!result.expired);
+        assert!(matches!(result.state, CheckState::Warning));
     }
 }

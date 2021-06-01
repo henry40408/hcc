@@ -25,19 +25,25 @@ struct ErrorMessage {
 }
 
 async fn show_domain_name(
-    domain_name: String,
+    domain_names: String,
     client: Arc<CheckClient>,
 ) -> Result<impl warp::Reply, Infallible> {
-    let result = match client.check_certificate(&domain_name).await {
+    let domain_names: Vec<&str> = domain_names.split(",").map(|s| s.trim()).collect();
+    let results = match client.check_certificates(domain_names.as_slice()) {
         Ok(r) => r,
         Err(e) => {
             return Ok(warp::reply::json(&ErrorMessage {
                 message: format!("{:?}", e),
-            }))
+            }));
         }
     };
-    let json = CheckResultJSON::new(&result);
-    Ok(warp::reply::json(&json))
+    if results.len() == 1 {
+        let json = CheckResultJSON::new(results.first().unwrap());
+        Ok(warp::reply::json(&json))
+    } else {
+        let json: Vec<CheckResultJSON> = results.iter().map(|r| CheckResultJSON::new(&r)).collect();
+        Ok(warp::reply::json(&json))
+    }
 }
 
 fn with_client(
@@ -54,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
     let opts: Opts = Opts::from_args();
-    let client = Arc::new(CheckClient::new());
+    let client = Arc::new(CheckClient::builder().elapsed(true).build());
 
     let show_domain_name = warp::path!(String)
         .and(with_client(client))
