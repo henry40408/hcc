@@ -1,6 +1,6 @@
 # hcc
 
-[![Build Status](https://ci.h08.io/api/badges/henry40408/hcc/status.svg)](https://ci.h08.io/henry40408/hcc)
+![GitHub Workflow](https://github.com/henry40408/hcc/actions/workflows/workflow.yml/badge.svg) ![GitHub](https://img.shields.io/github/license/henry40408/hcc)
 
 **H**TTPS **C**ertificate **C**heck
 
