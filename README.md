@@ -9,8 +9,8 @@
 Running as Docker container:
 
 ```bash
-$ make build-docker-image
-$ docker run -it -p 9292:9292 henry40408/hcc /hcc-server -b 0.0.0.0:9292
+$ make amd64
+$ docker run -it -p 9292:9292 henry40408/hcc:$(git rev-parse --short HEAD)-amd64 /hcc-server -b 0.0.0.0:9292
 ```
 
 Or run directly:
