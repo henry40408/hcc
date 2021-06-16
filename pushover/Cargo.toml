@@ -1,19 +1,23 @@
 [package]
-name = "hcc-server"
+name = "hcc-pushover"
 version = "1.0.0"
 authors = ["Heng-Yi Wu <2316687+henry40408@users.noreply.github.com>"]
 edition = "2018"
-description = "Server to check HTTPS Certificate"
+description = "Daemon to send check result to Pushover"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.38"
+chrono = { version = "0.4.19", default-features = false, features = ["clock"] }
 log = "0.4.14"
+futures = { version = "0.3.15", default-features = false }
 hcc = { path = "../core" }
+hyper = { version = "0.14", features = ["client"] }
+hyper-rustls = "0.22.1"
 pretty_env_logger = "0.4.0"
 serde = { version = "1.0.123", features = ["derive"] }
 serde_derive = "1.0.123"
+serde_urlencoded = "0.7.0"
 structopt = "0.3.21"
-tokio = { version = "1", features = ["rt-multi-thread"] }
-warp = { version = "0.3", default-features = false }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }

@@ -32,6 +32,15 @@ $ curl :9292/sha512.badssl.com,expired.badssl.com
 [{"state":"OK","checked_at":"2021-06-01T07:45:24+00:00","days":304,"domain_name":"sha512.badssl.com","expired_at":"2022-04-01T12:00:00+00:00","elapsed":172},{"state":"EXPIPRED","checked_at":"2021-06-01T07:45:24+00:00","days":0,"domain_name":"expired.badssl.com","expired_at":"1970-01-01T00:00:00+00:00","elapsed":0}]
 ```
 
+## Pushover integration
+
+```bash
+$ DOMAIN_NAMES=www.example.com,sha512.badssl.com \
+  PUSHOVER_TOKEN=token \
+  PUSHOVER_USER=user \
+  cargo run --bin hcc-pushover
+```
+
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.

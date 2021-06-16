@@ -1,5 +1,6 @@
 FROM scratch
 
 COPY target/armv7-unknown-linux-musleabihf/release/hcc-server /
+COPY target/armv7-unknown-linux-musleabihf/release/hcc-pushover /
 
-CMD ["/cdu"]
+CMD ["/hcc-server"]

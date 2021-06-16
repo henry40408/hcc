@@ -49,7 +49,7 @@ pub struct CheckResult {
     /// Exact expiration time in seconds since Unix epoch
     pub not_after: i64,
     /// Elapsed time in milliseconds
-    pub elapsed: u128,
+    pub elapsed: Option<u128>,
 }
 
 impl CheckResult {
@@ -68,38 +68,104 @@ impl CheckResult {
             ..Default::default()
         }
     }
+
+    /// Expiration date of certficate in RFC3339 format
+    ///
+    /// ```
+    /// # use hcc::CheckResult;
+    /// let result = CheckResult::default();
+    /// result.not_after_timestamp();
+    /// ```
+    pub fn not_after_timestamp(&self) -> String {
+        Utc.timestamp(self.not_after, 0).to_rfc3339()
+    }
+
+    /// Human-readable sentence of certificate state
+    ///
+    /// ```
+    /// # use hcc::CheckResult;
+    /// let result = CheckResult::default();
+    /// result.sentence();
+    /// ```
+    pub fn sentence(&self) -> String {
+        let days = self.days.to_formatted_string(&Locale::en);
+        match self.state {
+            CheckState::Unknown => format!("certificate state of {} is unknown", self.domain_name),
+            CheckState::Ok => format!(
+                "certificate of {} expires in {} days ({})",
+                self.domain_name,
+                days,
+                self.not_after_timestamp()
+            ),
+            CheckState::Warning => format!(
+                "certificate of {} expires in {} days ({})",
+                self.domain_name,
+                days,
+                self.not_after_timestamp()
+            ),
+            CheckState::Expired => format!(
+                "certificate of {} has expired ({})",
+                self.domain_name,
+                self.not_after_timestamp()
+            ),
+        }
+    }
+
+    /// Icon of certificate state in ASCII or Unicode
+    ///
+    /// ```
+    /// # use hcc::CheckResult;
+    /// let result = CheckResult::default();
+    /// result.state_icon(true);
+    /// result.state_icon(false);
+    /// ```
+    pub fn state_icon(&self, unicode: bool) -> String {
+        let s = match self.state {
+            CheckState::Unknown => {
+                if unicode {
+                    "\u{2753}"
+                } else {
+                    "[?]"
+                }
+            }
+            CheckState::Ok => {
+                if unicode {
+                    "\u{2705}"
+                } else {
+                    "[v]"
+                }
+            }
+            CheckState::Warning => {
+                if unicode {
+                    "\u{26a0}\u{fe0f}"
+                } else {
+                    "[-]"
+                }
+            }
+            CheckState::Expired => {
+                if unicode {
+                    "\u{274c}"
+                } else {
+                    "[x]"
+                }
+            }
+        };
+        s.to_string()
+    }
 }
 
 impl fmt::Display for CheckResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // [v] certificate of sha512.badssl.com expires in 512 days (timestamp in RFC3339)
-        // [-] certificate of sha512.badssl.com expires in 512 days (timestamp in RFC3339)
-        // [x] certificate of expired.badssl.com has expired (timestamp in RFC3339)
         let mut s = String::with_capacity(100);
 
-        match self.state {
-            CheckState::Unknown => s.push_str("[?]"),
-            CheckState::Ok => s.push_str("[v]"),
-            CheckState::Warning => s.push_str("[-]"),
-            CheckState::Expired => s.push_str("[x]"),
-        };
+        s.push_str(&self.state_icon(false));
 
-        s.push(' ');
+        s.push_str(&" ");
 
-        s.push_str(&format!("certificate of {0}", self.domain_name));
+        s.push_str(&self.sentence());
 
-        s.push(' ');
-
-        if matches!(self.state, CheckState::Expired) {
-            s.push_str("has expired");
-        } else {
-            let days = self.days.to_formatted_string(&Locale::en);
-            let ts = Utc.timestamp(self.not_after, 0).to_rfc3339();
-            s.push_str(&format!("expires in {0} days ({1})", days, ts));
-        }
-
-        if self.elapsed > 0 {
-            s.push_str(&format!(", {0}ms elapsed", self.elapsed));
+        if let Some(elapsed) = self.elapsed {
+            s.push_str(&format!(", {0}ms elapsed", elapsed));
         }
 
         write!(f, "{}", s)
@@ -143,7 +209,7 @@ impl CheckResultJSON {
             domain_name: result.domain_name.clone(),
             checked_at: Utc.timestamp(result.checked_at, 0).to_rfc3339(),
             expired_at: Utc.timestamp(result.not_after, 0).to_rfc3339(),
-            elapsed: result.elapsed,
+            elapsed: result.elapsed.unwrap_or(0),
         }
     }
 }
@@ -182,7 +248,7 @@ mod test {
     }
 
     #[test]
-    fn test_display_not_ok() {
+    fn test_display_warning() {
         let mut result = build_result();
         result.state = CheckState::Warning;
         let left = format!("{0}", result);
@@ -198,7 +264,10 @@ mod test {
         let mut result = build_result();
         result.state = CheckState::Expired;
         let left = format!("{0}", result);
-        let right = "[x] certificate of example.com has expired";
+        let right = format!(
+            "[x] certificate of example.com has expired ({})",
+            Utc.timestamp(result.not_after, 0).to_rfc3339()
+        );
         assert_eq!(left, right);
     }
 }

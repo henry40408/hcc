@@ -1,2 +1,3 @@
 target/
 !target/armv7-unknown-linux-musleabihf/release/hcc-server
+!target/armv7-unknown-linux-musleabihf/release/hcc-pushover
