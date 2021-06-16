@@ -69,7 +69,7 @@ async fn check_domain_names<S: AsRef<str>>(
 
     let mut futs = vec![];
 
-    let https = HttpsConnector::with_native_roots();
+    let https = HttpsConnector::with_webpki_roots();
     let pushover_client = Client::builder().build(https);
     for result in results {
         let state_icon = result.state_icon(true);

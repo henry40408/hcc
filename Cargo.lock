@@ -582,6 +582,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "webpki",
+ "webpki-roots",
 ]
 
 [[package]]
