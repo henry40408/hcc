@@ -102,7 +102,11 @@ impl CheckClient {
             days: duration.num_days(),
             domain_name: domain_name.to_string(),
             not_after: not_after.timestamp(),
-            elapsed: if self.elapsed { elapsed.as_millis() } else { 0 },
+            elapsed: if self.elapsed {
+                Some(elapsed.as_millis())
+            } else {
+                None
+            },
             ..Default::default()
         })
     }
