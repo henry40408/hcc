@@ -3,10 +3,7 @@ use std::env;
 use std::time::Duration;
 
 use hcc::CheckClient;
-use hyper::{Body, Client, Method, Request};
-use hyper_rustls::HttpsConnector;
 use log::info;
-use serde::Serialize;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -24,15 +21,6 @@ struct Opts {
     /// Pushover user key,
     #[structopt(short = "u", long = "user", env = "PUSHOVER_USER")]
     pushover_user: String,
-}
-
-/// ref: https://pushover.net/api#messages
-#[derive(Serialize)]
-struct PushoverBody<'a> {
-    token: &'a str,
-    user: &'a str,
-    message: &'a str,
-    title: &'a str,
 }
 
 const PUSHOVER_API: &'static str = "https://api.pushover.net/1/messages.json";
@@ -69,27 +57,22 @@ async fn check_domain_names<S: AsRef<str>>(
 
     let mut futs = vec![];
 
-    let https = HttpsConnector::with_webpki_roots();
-    let pushover_client = Client::builder().build(https);
+    let pushover_client = reqwest::Client::new();
     for result in results {
         let state_icon = result.state_icon(true);
         let sentence = result.sentence();
 
         let message = format!("{} {}", state_icon, sentence);
-        let body = PushoverBody {
-            message: &message,
-            user: &opts.pushover_user,
-            token: &opts.pushover_token,
-            title: &"HTTP Certificate Check",
-        };
-        let body = serde_urlencoded::to_string(body)?;
-
-        let req = Request::builder()
-            .method(Method::POST)
-            .uri(PUSHOVER_API)
-            .body(Body::from(body))?;
-
-        futs.push(pushover_client.request(req));
+        let form = [
+            ("message", &message),
+            ("user", &opts.pushover_user),
+            ("token", &opts.pushover_token),
+            (
+                "title",
+                &format!("HTTP Certificate Check - {}", result.domain_name),
+            ),
+        ];
+        futs.push(pushover_client.post(PUSHOVER_API).form(&form).send());
     }
 
     futures::future::try_join_all(futs).await?;

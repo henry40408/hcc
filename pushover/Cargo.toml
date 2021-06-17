@@ -13,11 +13,7 @@ chrono = { version = "0.4.19", default-features = false, features = ["clock"] }
 log = "0.4.14"
 futures = { version = "0.3.15", default-features = false }
 hcc = { path = "../core" }
-hyper = { version = "0.14", features = ["client"] }
-hyper-rustls = { version = "0.22.1", default-features = false, features = ["webpki-tokio"] }
 pretty_env_logger = "0.4.0"
-serde = { version = "1.0.123", features = ["derive"] }
-serde_derive = "1.0.123"
-serde_urlencoded = "0.7.0"
+reqwest = { version = "0.11.3", default-features = false, features = ["rustls-tls"] }
 structopt = "0.3.21"
 tokio = { version = "1", features = ["rt-multi-thread", "time"] }
