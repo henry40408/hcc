@@ -1,6 +1,11 @@
-#[forbid(unsafe_code)]
+use anyhow::bail;
+use chrono::Utc;
+use cron::Schedule;
 use std::env;
+use std::str::FromStr;
+#[forbid(unsafe_code)]
 use std::time::Duration;
+use std::time::Instant;
 
 use hcc::CheckClient;
 use log::info;
@@ -12,9 +17,9 @@ struct Opts {
     /// Domain names to check, separated by comma e.g. sha512.badssl.com,expired.badssl.com
     #[structopt(short, long, env = "DOMAIN_NAMES")]
     domain_names: String,
-    /// Interval between each checks in seconds
-    #[structopt(short, long, env = "INTERVAL", default_value = "86400")]
-    interval: u64,
+    /// Cron
+    #[structopt(short, long, env = "CRON", default_value = "0 */5 * * * * *")]
+    cron: String,
     /// Pushover API key
     #[structopt(short = "t", long = "token", env = "PUSHOVER_TOKEN")]
     pushover_token: String,
@@ -36,16 +41,28 @@ async fn main() -> anyhow::Result<()> {
     let opts: Opts = Opts::from_args();
     let domain_names: Vec<_> = opts.domain_names.split(",").collect();
 
-    info!("check HTTPS certficates every {} seconds", opts.interval);
+    info!("check HTTPS certficates with cron {}", &opts.cron);
 
-    let mut timer = tokio::time::interval(Duration::from_secs(opts.interval));
-    timer.tick().await; // first tick
-    loop {
-        info!("check certificate of domain names");
+    let sleep_duration = Duration::from_millis(999);
+    let schedule = match Schedule::from_str(&opts.cron) {
+        Ok(s) => s,
+        Err(e) => bail!("failed to determine cron: {:?}", e),
+    };
+    for datetime in schedule.upcoming(Utc) {
+        info!("check certificate of {} at {}", opts.domain_names, datetime);
+        loop {
+            if Utc::now() > datetime {
+                break;
+            } else {
+                std::thread::sleep(sleep_duration);
+            }
+        }
+        let instant = Instant::now();
         check_domain_names(&opts, &domain_names).await?;
-        info!("done, wait for the next round");
-        timer.tick().await; // next tick
+        let duration = Instant::now() - instant;
+        info!("done in {}ms", duration.as_millis());
     }
+    Ok(())
 }
 
 async fn check_domain_names<S: AsRef<str>>(
