@@ -1,8 +1,8 @@
-#[forbid(unsafe_code)]
+#![forbid(unsafe_code)]
 use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 
 use log::info;
 use serde::Serialize;
@@ -28,7 +28,7 @@ async fn show_domain_name(
     domain_names: String,
     client: Arc<CheckClient>,
 ) -> Result<impl warp::Reply, Infallible> {
-    let domain_names: Vec<&str> = domain_names.split(",").map(|s| s.trim()).collect();
+    let domain_names: Vec<&str> = domain_names.split(',').map(|s| s.trim()).collect();
     let results = match client.check_certificates(domain_names.as_slice()) {
         Ok(r) => r,
         Err(e) => {
@@ -70,9 +70,22 @@ async fn main() -> anyhow::Result<()> {
         .and(show_domain_name)
         .with(warp::log("hcc_server"));
 
+    let (tx, rx) = mpsc::channel();
+
     let addr: SocketAddr = opts.bind.parse()?;
     info!("Served on {0}", opts.bind);
-    warp::serve(routes).run(addr).await;
+    let (_addr, server) = warp::serve(routes).bind_with_graceful_shutdown(addr, async move {
+        let _ = rx.recv();
+        info!("shutdown gracefully");
+    });
+
+    ctrlc::set_handler(move || {
+        info!("SIGINT received");
+        let _ = tx.send(true);
+    })
+    .expect("unable to bind signal handler");
+
+    tokio::task::spawn(server).await?;
 
     Ok(())
 }

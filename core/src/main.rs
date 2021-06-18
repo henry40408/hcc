@@ -1,4 +1,4 @@
-#[forbid(unsafe_code)]
+#![forbid(unsafe_code)]
 use structopt::StructOpt;
 
 use hcc::{CheckClient, CheckResultJSON};
@@ -43,7 +43,7 @@ fn main() -> anyhow::Result<()> {
 
 fn check_command<S: AsRef<str>>(
     opts: &Opts,
-    domain_names: &Vec<S>,
+    domain_names: &[S],
     grace_in_days: i64,
 ) -> anyhow::Result<()> {
     let client = CheckClient::builder()
@@ -51,7 +51,7 @@ fn check_command<S: AsRef<str>>(
         .grace_in_days(grace_in_days)
         .build();
 
-    let results = client.check_certificates(domain_names.as_slice())?;
+    let results = client.check_certificates(domain_names)?;
 
     if opts.json {
         let s = if results.len() > 1 {

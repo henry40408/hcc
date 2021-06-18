@@ -107,7 +107,6 @@ impl CheckClient {
             } else {
                 None
             },
-            ..Default::default()
         })
     }
 

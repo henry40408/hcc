@@ -1,15 +1,16 @@
-use anyhow::bail;
-use chrono::Utc;
-use cron::Schedule;
+#![forbid(unsafe_code)]
 use std::env;
 use std::str::FromStr;
-#[forbid(unsafe_code)]
 use std::time::Duration;
 use std::time::Instant;
 
+use anyhow::bail;
+use chrono::Utc;
+use cron::Schedule;
 use hcc::CheckClient;
-use log::info;
+use log::{error, info};
 use structopt::StructOpt;
+use tokio::sync::oneshot;
 
 #[derive(Debug, StructOpt)]
 #[structopt(author, about)]
@@ -28,7 +29,7 @@ struct Opts {
     pushover_user: String,
 }
 
-const PUSHOVER_API: &'static str = "https://api.pushover.net/1/messages.json";
+const PUSHOVER_API: &str = "https://api.pushover.net/1/messages.json";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -39,36 +40,67 @@ async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
     let opts: Opts = Opts::from_args();
-    let domain_names: Vec<_> = opts.domain_names.split(",").collect();
-
-    info!("check HTTPS certficates with cron {}", &opts.cron);
-
-    let sleep_duration = Duration::from_millis(999);
     let schedule = match Schedule::from_str(&opts.cron) {
         Ok(s) => s,
         Err(e) => bail!("failed to determine cron: {:?}", e),
     };
-    for datetime in schedule.upcoming(Utc) {
-        info!("check certificate of {} at {}", opts.domain_names, datetime);
-        loop {
-            if Utc::now() > datetime {
-                break;
-            } else {
-                std::thread::sleep(sleep_duration);
+
+    info!("check HTTPS certficates with cron {}", &opts.cron);
+
+    let (tx1, rx1) = oneshot::channel();
+    tokio::spawn(async {
+        let _ = tokio::signal::ctrl_c().await;
+        info!("SIGINT received");
+        let _ = tx1.send(());
+    });
+
+    let (tx2, rx2) = oneshot::channel::<anyhow::Result<()>>();
+    tokio::spawn(async move {
+        for datetime in schedule.upcoming(Utc) {
+            info!("check certificate of {} at {}", opts.domain_names, datetime);
+            loop {
+                if Utc::now() > datetime {
+                    break;
+                } else {
+                    tokio::time::sleep(Duration::from_millis(999)).await;
+                }
+            }
+            let instant = Instant::now();
+            let domain_names: Vec<_> = opts.domain_names.split(',').collect();
+            match check_domain_names(&opts, &domain_names).await {
+                Ok(_) => {}
+                Err(e) => {
+                    let _ = tx2.send(Err(e));
+                    break;
+                }
+            }
+            let duration = Instant::now() - instant;
+            info!("done in {}ms", duration.as_millis());
+        }
+    });
+
+    tokio::select! {
+        _ = rx1 => {
+            info!("shutdown gracefully");
+        }
+        r = rx2 => {
+            if let Ok(s) = r {
+                match s {
+                    Ok(_) => {
+                        info!("ok");
+                    }
+                    Err(e) => {
+                        error!("{:?}",e);
+                    }
+                }
             }
         }
-        let instant = Instant::now();
-        check_domain_names(&opts, &domain_names).await?;
-        let duration = Instant::now() - instant;
-        info!("done in {}ms", duration.as_millis());
     }
+
     Ok(())
 }
 
-async fn check_domain_names<S: AsRef<str>>(
-    opts: &Opts,
-    domain_names: &Vec<S>,
-) -> anyhow::Result<()> {
+async fn check_domain_names<S: AsRef<str>>(opts: &Opts, domain_names: &[S]) -> anyhow::Result<()> {
     let check_client = CheckClient::new();
     let results = check_client.check_certificates(domain_names)?;
 
