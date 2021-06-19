@@ -4,7 +4,6 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::time::Instant;
 
-use anyhow::bail;
 use chrono::Utc;
 use cron::Schedule;
 use log::info;
@@ -40,10 +39,7 @@ async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
     let opts: Opts = Opts::from_args();
-    let schedule = match Schedule::from_str(&opts.cron) {
-        Ok(s) => s,
-        Err(e) => bail!("failed to determine cron: {:?}", e),
-    };
+    let schedule = Schedule::from_str(&opts.cron)?;
 
     info!("check HTTPS certficates with cron {}", &opts.cron);
     for datetime in schedule.upcoming(Utc) {
