@@ -7,10 +7,11 @@ use std::time::Instant;
 use anyhow::bail;
 use chrono::Utc;
 use cron::Schedule;
-use hcc::CheckClient;
 use log::{error, info};
 use structopt::StructOpt;
 use tokio::sync::oneshot;
+
+use hcc::CheckClient;
 
 #[derive(Debug, StructOpt)]
 #[structopt(author, about)]

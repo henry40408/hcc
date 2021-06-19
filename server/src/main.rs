@@ -2,7 +2,7 @@
 use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
 use log::info;
 use serde::Serialize;
@@ -70,22 +70,14 @@ async fn main() -> anyhow::Result<()> {
         .and(show_domain_name)
         .with(warp::log("hcc_server"));
 
-    let (tx, rx) = mpsc::channel();
-
     let addr: SocketAddr = opts.bind.parse()?;
     info!("Served on {0}", opts.bind);
-    let (_addr, server) = warp::serve(routes).bind_with_graceful_shutdown(addr, async move {
-        let _ = rx.recv();
+
+    let (_addr, serve) = warp::serve(routes).bind_with_graceful_shutdown(addr, async {
+        let _ = tokio::signal::ctrl_c().await;
         info!("shutdown gracefully");
     });
-
-    ctrlc::set_handler(move || {
-        info!("SIGINT received");
-        let _ = tx.send(true);
-    })
-    .expect("unable to bind signal handler");
-
-    tokio::task::spawn(server).await?;
+    tokio::spawn(serve).await?;
 
     Ok(())
 }
