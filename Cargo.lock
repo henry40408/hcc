@@ -152,6 +152,7 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits",
+ "time",
  "winapi",
 ]
 
@@ -171,6 +172,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cron"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e009ed0b762cf7a967a34dfdc67d5967d3f828f12901d37081432c3dd1668f8f"
+dependencies = [
+ "chrono",
+ "nom 4.1.1",
+ "once_cell",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -182,7 +194,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd17d13ecf875e704369fdbde242483ac769fc18f6af21e43d5a692a079732fc"
 dependencies = [
- "nom",
+ "nom 6.1.0",
  "num-bigint",
  "num-traits",
  "proc-macro-hack",
@@ -195,7 +207,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4b1e27396f46037881c39d821660f2ff48797aaa7152a45ded7a93b368a819"
 dependencies = [
  "der-oid-macro",
- "nom",
+ "nom 6.1.0",
  "num-bigint",
  "num-traits",
  "proc-macro-hack",
@@ -410,10 +422,11 @@ dependencies = [
 
 [[package]]
 name = "hcc-pushover"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "chrono",
+ "cron",
  "futures",
  "hcc",
  "log",
@@ -425,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "hcc-server"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "hcc",
@@ -694,6 +707,15 @@ name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
+
+[[package]]
+name = "nom"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c349f68f25f596b9f44cf0e7c69752a5c633b0550c3ff849518bfba0233774a"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "nom"
@@ -975,7 +997,7 @@ version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7390af60e66c44130b4c5ea85f2555b7ace835d73b4b889c704dc3cb4c0468c8"
 dependencies = [
- "nom",
+ "nom 6.1.0",
 ]
 
 [[package]]
@@ -1072,6 +1094,15 @@ dependencies = [
  "digest",
  "fake-simd",
  "opaque-debug",
+]
+
+[[package]]
+name = "signal-hook-registry"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -1235,8 +1266,11 @@ dependencies = [
  "memchr",
  "mio",
  "num_cpus",
+ "once_cell",
  "pin-project-lite",
+ "signal-hook-registry",
  "tokio-macros",
+ "winapi",
 ]
 
 [[package]]
@@ -1609,7 +1643,7 @@ dependencies = [
  "der-oid-macro",
  "der-parser",
  "lazy_static",
- "nom",
+ "nom 6.1.0",
  "num-bigint",
  "oid-registry",
  "rusticata-macros",

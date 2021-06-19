@@ -1,4 +1,4 @@
-#[forbid(unsafe_code)]
+#![forbid(unsafe_code)]
 use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
@@ -28,7 +28,7 @@ async fn show_domain_name(
     domain_names: String,
     client: Arc<CheckClient>,
 ) -> Result<impl warp::Reply, Infallible> {
-    let domain_names: Vec<&str> = domain_names.split(",").map(|s| s.trim()).collect();
+    let domain_names: Vec<&str> = domain_names.split(',').map(|s| s.trim()).collect();
     let results = match client.check_certificates(domain_names.as_slice()) {
         Ok(r) => r,
         Err(e) => {
@@ -72,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
 
     let addr: SocketAddr = opts.bind.parse()?;
     info!("Served on {0}", opts.bind);
-    warp::serve(routes).run(addr).await;
+    warp::serve(routes).bind(addr).await;
 
     Ok(())
 }
