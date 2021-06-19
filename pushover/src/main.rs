@@ -7,9 +7,8 @@ use std::time::Instant;
 use anyhow::bail;
 use chrono::Utc;
 use cron::Schedule;
-use log::{error, info};
+use log::info;
 use structopt::StructOpt;
-use tokio::sync::oneshot;
 
 use hcc::CheckClient;
 
@@ -47,55 +46,20 @@ async fn main() -> anyhow::Result<()> {
     };
 
     info!("check HTTPS certficates with cron {}", &opts.cron);
-
-    let (tx1, rx1) = oneshot::channel();
-    tokio::spawn(async {
-        let _ = tokio::signal::ctrl_c().await;
-        info!("SIGINT received");
-        let _ = tx1.send(());
-    });
-
-    let (tx2, rx2) = oneshot::channel::<anyhow::Result<()>>();
-    tokio::spawn(async move {
-        for datetime in schedule.upcoming(Utc) {
-            info!("check certificate of {} at {}", opts.domain_names, datetime);
-            loop {
-                if Utc::now() > datetime {
-                    break;
-                } else {
-                    tokio::time::sleep(Duration::from_millis(999)).await;
-                }
-            }
-            let instant = Instant::now();
-            let domain_names: Vec<_> = opts.domain_names.split(',').collect();
-            match check_domain_names(&opts, &domain_names).await {
-                Ok(_) => {}
-                Err(e) => {
-                    let _ = tx2.send(Err(e));
-                    break;
-                }
-            }
-            let duration = Instant::now() - instant;
-            info!("done in {}ms", duration.as_millis());
-        }
-    });
-
-    tokio::select! {
-        _ = rx1 => {
-            info!("shutdown gracefully");
-        }
-        r = rx2 => {
-            if let Ok(s) = r {
-                match s {
-                    Ok(_) => {
-                        info!("ok");
-                    }
-                    Err(e) => {
-                        error!("{:?}",e);
-                    }
-                }
+    for datetime in schedule.upcoming(Utc) {
+        info!("check certificate of {} at {}", opts.domain_names, datetime);
+        loop {
+            if Utc::now() > datetime {
+                break;
+            } else {
+                tokio::time::sleep(Duration::from_millis(999)).await;
             }
         }
+        let instant = Instant::now();
+        let domain_names: Vec<_> = opts.domain_names.split(',').collect();
+        check_domain_names(&opts, &domain_names).await?;
+        let duration = Instant::now() - instant;
+        info!("done in {}ms", duration.as_millis());
     }
 
     Ok(())

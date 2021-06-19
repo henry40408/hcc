@@ -72,12 +72,7 @@ async fn main() -> anyhow::Result<()> {
 
     let addr: SocketAddr = opts.bind.parse()?;
     info!("Served on {0}", opts.bind);
-
-    let (_addr, serve) = warp::serve(routes).bind_with_graceful_shutdown(addr, async {
-        let _ = tokio::signal::ctrl_c().await;
-        info!("shutdown gracefully");
-    });
-    tokio::spawn(serve).await?;
+    warp::serve(routes).bind(addr).await;
 
     Ok(())
 }
