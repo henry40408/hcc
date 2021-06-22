@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn check_domain_names<S: AsRef<str>>(opts: &Opts, domain_names: &[S]) -> anyhow::Result<()> {
+async fn check_domain_names(opts: &Opts, domain_names: &[&str]) -> anyhow::Result<()> {
     let check_client = CheckClient::new();
     let results = check_client.check_certificates(domain_names)?;
 

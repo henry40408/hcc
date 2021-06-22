@@ -36,14 +36,17 @@ fn main() -> anyhow::Result<()> {
         Some(Command::Check {
             ref domain_names,
             grace_in_days,
-        }) => check_command(&opts, domain_names, grace_in_days),
+        }) => {
+            let domain_names: Vec<&str> = domain_names.iter().map(AsRef::as_ref).collect();
+            check_command(&opts, &domain_names, grace_in_days)
+        }
         None => Ok(()),
     }
 }
 
-fn check_command<S: AsRef<str>>(
+fn check_command<'a>(
     opts: &Opts,
-    domain_names: &[S],
+    domain_names: &'a [&str],
     grace_in_days: i64,
 ) -> anyhow::Result<()> {
     let client = CheckClient::builder()
