@@ -61,7 +61,10 @@ impl CheckClient {
     /// let client = CheckClient::new();
     /// client.check_certificate("sha512.badssl.com");
     /// ```
-    pub async fn check_certificate(&self, domain_name: &str) -> anyhow::Result<CheckResult> {
+    pub async fn check_certificate<'a>(
+        &'a self,
+        domain_name: &'a str,
+    ) -> anyhow::Result<CheckResult<'a>> {
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain_name)?;
         let mut sess = rustls::ClientSession::new(&self.config, dns_name);
         let mut sock = TcpStream::connect(format!("{0}:443", domain_name))?;
@@ -100,7 +103,7 @@ impl CheckClient {
             state,
             checked_at: self.checked_at.timestamp(),
             days: duration.num_days(),
-            domain_name: domain_name.to_string(),
+            domain_name,
             not_after: not_after.timestamp(),
             elapsed: if self.elapsed {
                 Some(elapsed.as_millis())
@@ -117,15 +120,14 @@ impl CheckClient {
     /// let client = CheckClient::new();
     /// client.check_certificates(&["sha256.badssl.com", "sha256.badssl.com"]);
     /// ```
-    pub fn check_certificates<S: AsRef<str>>(
-        &self,
-        domain_names: &[S],
-    ) -> anyhow::Result<Vec<CheckResult>> {
+    pub fn check_certificates<'a>(
+        &'a self,
+        domain_names: &'a [&str],
+    ) -> anyhow::Result<Vec<CheckResult<'a>>> {
         let client = Arc::new(self);
 
         let mut futs = vec![];
         for domain_name in domain_names {
-            let domain_name = domain_name.as_ref();
             let client = client.clone();
             futs.push(client.check_certificate(domain_name));
         }

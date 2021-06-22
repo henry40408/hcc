@@ -37,7 +37,7 @@ impl fmt::Display for CheckState {
 
 /// Check result
 #[derive(Debug, Default)]
-pub struct CheckResult {
+pub struct CheckResult<'a> {
     /// State of certificate
     pub state: CheckState,
     /// When is domain name got checked in seconds since Unix epoch
@@ -45,14 +45,14 @@ pub struct CheckResult {
     /// Remaining days to the expiration date
     pub days: i64,
     /// Domain name that got checked
-    pub domain_name: String,
+    pub domain_name: &'a str,
     /// Exact expiration time in seconds since Unix epoch
     pub not_after: i64,
     /// Elapsed time in milliseconds
     pub elapsed: Option<u128>,
 }
 
-impl CheckResult {
+impl<'a> CheckResult<'a> {
     /// Create a result from expired domain name and when the check occurred
     ///
     /// ```
@@ -60,11 +60,11 @@ impl CheckResult {
     /// use chrono::Utc;
     /// CheckResult::expired("expired.badssl.com", &Utc::now());
     /// ```
-    pub fn expired(domain_name: &str, checked_at: &DateTime<Utc>) -> Self {
+    pub fn expired(domain_name: &'a str, checked_at: &'a DateTime<Utc>) -> Self {
         CheckResult {
             state: CheckState::Expired,
             checked_at: checked_at.timestamp(),
-            domain_name: domain_name.to_string(),
+            domain_name,
             ..Default::default()
         }
     }
@@ -154,7 +154,7 @@ impl CheckResult {
     }
 }
 
-impl fmt::Display for CheckResult {
+impl<'a> fmt::Display for CheckResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::with_capacity(100);
 
@@ -206,7 +206,7 @@ impl CheckResultJSON {
         CheckResultJSON {
             state: result.state.to_string(),
             days: result.days,
-            domain_name: result.domain_name.clone(),
+            domain_name: result.domain_name.to_string(),
             checked_at: Utc.timestamp(result.checked_at, 0).to_rfc3339(),
             expired_at: Utc.timestamp(result.not_after, 0).to_rfc3339(),
             elapsed: result.elapsed.unwrap_or(0),
@@ -221,14 +221,14 @@ mod test {
     use crate::check_result::CheckState;
     use crate::CheckResult;
 
-    fn build_result() -> CheckResult {
+    fn build_result<'a>() -> CheckResult<'a> {
         let days = 512;
         let now = Utc::now().round_subsecs(0);
         let expired_at = now + Duration::days(days);
         CheckResult {
             checked_at: now.timestamp(),
             days,
-            domain_name: "example.com".to_string(),
+            domain_name: &"example.com",
             not_after: expired_at.timestamp(),
             ..Default::default()
         }
