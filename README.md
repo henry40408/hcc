@@ -4,22 +4,34 @@
 
 **H**TTPS **C**ertificate **C**heck
 
-## Installation
+## Features
 
-Running as Docker container:
+* A daemon checks HTTPS certificates periodically with cron
+* An HTTP server performs checks with incoming requests
+* Check results can be sent to [Pushover](https://pushover.net/)
+
+## Usage
+
+### CLI
+
+```bash
+$ cargo run --bin hcc -- check httpbin.org
+```
+
+### Server
+
+Run as Docker container:
 
 ```bash
 $ make amd64
 $ docker run -it -p 9292:9292 henry40408/hcc:$(git rev-parse --short HEAD)-amd64 /hcc-server -b 0.0.0.0:9292
 ```
 
-Or run directly:
+Run directly:
 
 ```bash
 $ cargo run --bin hcc-server
 ```
-
-## Usage
 
 ```bash
 $ curl :9292/sha512.badssl.com
@@ -32,7 +44,7 @@ $ curl :9292/sha512.badssl.com,expired.badssl.com
 [{"state":"OK","checked_at":"2021-06-01T07:45:24+00:00","days":304,"domain_name":"sha512.badssl.com","expired_at":"2022-04-01T12:00:00+00:00","elapsed":172},{"state":"EXPIPRED","checked_at":"2021-06-01T07:45:24+00:00","days":0,"domain_name":"expired.badssl.com","expired_at":"1970-01-01T00:00:00+00:00","elapsed":0}]
 ```
 
-## Pushover integration
+### Daemon and Pushover
 
 ```bash
 $ DOMAIN_NAMES=www.example.com,sha512.badssl.com \
