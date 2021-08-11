@@ -1,14 +1,11 @@
 #![forbid(unsafe_code)]
-use std::convert::Infallible;
 use std::env;
-use std::net::SocketAddr;
-use std::sync::Arc;
 
 use log::info;
 use serde::Serialize;
 use structopt::StructOpt;
-use warp::Filter;
 
+use actix_web::{get, middleware, web, App, HttpResponse, HttpServer};
 use hcc::{CheckClient, CheckResultJSON};
 
 #[derive(Debug, StructOpt)]
@@ -24,35 +21,34 @@ struct ErrorMessage {
     message: String,
 }
 
+struct AppState {
+    client: CheckClient,
+}
+
+#[get("/{domain_names}")]
 async fn show_domain_name(
-    domain_names: String,
-    client: Arc<CheckClient>,
-) -> Result<impl warp::Reply, Infallible> {
+    data: web::Data<AppState>,
+    web::Path((domain_names,)): web::Path<(String,)>,
+) -> HttpResponse {
     let domain_names: Vec<&str> = domain_names.split(',').map(|s| s.trim()).collect();
-    let results = match client.check_certificates(domain_names.as_slice()) {
+    let results = match data.client.check_certificates(domain_names.as_slice()) {
         Ok(r) => r,
         Err(e) => {
-            return Ok(warp::reply::json(&ErrorMessage {
+            return HttpResponse::InternalServerError().json(&ErrorMessage {
                 message: format!("{:?}", e),
-            }));
+            });
         }
     };
     if results.len() == 1 {
         let json = CheckResultJSON::new(results.first().unwrap());
-        Ok(warp::reply::json(&json))
+        HttpResponse::Ok().json(&json)
     } else {
         let json: Vec<CheckResultJSON> = results.iter().map(|r| CheckResultJSON::new(&r)).collect();
-        Ok(warp::reply::json(&json))
+        HttpResponse::Ok().json(&json)
     }
 }
 
-fn with_client(
-    client: Arc<CheckClient>,
-) -> impl Filter<Extract = (Arc<CheckClient>,), Error = Infallible> + Clone {
-    warp::any().map(move || client.clone())
-}
-
-#[tokio::main]
+#[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     if env::var_os("RUST_LOG").is_none() {
         env::set_var("RUST_LOG", "hcc_server=info");
@@ -60,19 +56,20 @@ async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
     let opts: Opts = Opts::from_args();
-    let client = Arc::new(CheckClient::builder().elapsed(true).build());
+    let data = web::Data::new(AppState {
+        client: CheckClient::builder().elapsed(true).build(),
+    });
 
-    let show_domain_name = warp::path!(String)
-        .and(with_client(client))
-        .and_then(show_domain_name);
-
-    let routes = warp::any()
-        .and(show_domain_name)
-        .with(warp::log("hcc_server"));
-
-    let addr: SocketAddr = opts.bind.parse()?;
-    info!("Served on {0}", opts.bind);
-    warp::serve(routes).bind(addr).await;
+    info!("Served on {0}", &opts.bind);
+    HttpServer::new(move || {
+        App::new()
+            .app_data(data.clone())
+            .wrap(middleware::Logger::default())
+            .service(show_domain_name)
+    })
+    .bind(&opts.bind)?
+    .run()
+    .await?;
 
     Ok(())
 }
