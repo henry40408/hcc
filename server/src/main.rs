@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
-use std::env;
 
 use log::info;
 use serde::Serialize;
 use structopt::StructOpt;
 
 use actix_web::{get, middleware, web, App, HttpResponse, HttpServer};
+use env_logger::Env;
 use hcc::{CheckClient, CheckResultJSON};
 
 #[derive(Debug, StructOpt)]
@@ -50,10 +50,7 @@ async fn show_domain_name(
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
-    if env::var_os("RUST_LOG").is_none() {
-        env::set_var("RUST_LOG", "hcc_server=info");
-    }
-    pretty_env_logger::init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     let opts: Opts = Opts::from_args();
     let data = web::Data::new(AppState {
